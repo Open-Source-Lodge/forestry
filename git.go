@@ -65,6 +65,10 @@ func worktrees() ([]Worktree, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseWorktreeOutput(out), nil
+}
+
+func parseWorktreeOutput(out string) []Worktree {
 	var list []Worktree
 	var cur *Worktree
 	for _, line := range strings.Split(out, "\n") {
@@ -91,7 +95,7 @@ func worktrees() ([]Worktree, error) {
 	if len(list) > 0 {
 		list[0].Main = true
 	}
-	return list, nil
+	return list
 }
 
 // mainWorktree is the original checkout, which git always lists first.
