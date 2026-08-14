@@ -69,6 +69,8 @@ type model struct {
 	current string
 	prs     map[string]PR
 	cursor  int
+	// openPath asks tui() to open a shell there after Bubble Tea exits.
+	openPath string
 	mode    mode
 	inputs  []textinput.Model
 	focus   int
@@ -92,8 +94,15 @@ func tui() error {
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(cursorStyle))
 	// Start on the worktree we were launched from, if any.
 	here, _ := git("rev-parse", "--show-toplevel")
-	_, err = tea.NewProgram(model{repo: repo, spinner: sp, want: here}, tea.WithAltScreen()).Run()
-	return err
+	mdl, err := tea.NewProgram(model{repo: repo, spinner: sp, want: here}, tea.WithAltScreen()).Run()
+	if err != nil {
+		return err
+	}
+	m, ok := mdl.(model)
+	if !ok || m.openPath == "" {
+		return nil
+	}
+	return runShell(m.openPath)
 }
 
 func (m model) Init() tea.Cmd { return loadRows }
@@ -138,9 +147,8 @@ func removeCmd(wt Worktree, force bool) tea.Cmd {
 	}
 }
 
-// shellCmd hands the terminal to an interactive shell rooted in the worktree,
-// since a child process cannot change the directory of the shell that ran it.
-func shellCmd(path string) tea.Cmd {
+// runShell runs an interactive shell rooted in path.
+func runShell(path string) error {
 	sh := os.Getenv("SHELL")
 	if sh == "" {
 		sh = "/bin/sh"
@@ -148,9 +156,10 @@ func shellCmd(path string) tea.Cmd {
 	c := exec.Command(sh)
 	c.Dir = path
 	c.Env = append(os.Environ(), "FORESTRY_WORKTREE="+path)
-	return tea.ExecProcess(c, func(error) tea.Msg {
-		return doneMsg{text: "left " + filepath.Base(path), path: path}
-	})
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c.Run()
 }
 
 // editorCmd opens the worktree in the configured editor. A terminal editor gets
@@ -266,7 +275,8 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, loadRows
 	case "enter", "o":
 		if wt, ok := m.selected(); ok {
-			return m, shellCmd(wt.Path)
+			m.openPath = wt.Path
+			return m, tea.Quit
 		}
 	case "e":
 		if wt, ok := m.selected(); ok {
