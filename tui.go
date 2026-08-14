@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,7 +27,7 @@ var (
 )
 
 const (
-	listHelp   = "↑↓ move · enter shell · e editor · n new · d remove · r refresh · q quit"
+	listHelp   = "↑↓ move · enter shell · e editor · n new · d remove · p open PR · r refresh · q quit"
 	newHelp    = "tab next field · enter create · esc cancel"
 	removeHelp = "y remove · f force remove · esc cancel"
 	busyHelp   = "working · ctrl+c quit"
@@ -173,6 +174,16 @@ func editorCmd(path string) tea.Cmd {
 	})
 }
 
+// openPRCmd opens the pull request URL in the default browser via the GitHub CLI.
+func openPRCmd(pr PR) tea.Cmd {
+	return func() tea.Msg {
+		if _, err := command("gh", "pr", "view", "--web", fmt.Sprintf("%d", pr.Number)); err != nil {
+			return doneMsg{err: err}
+		}
+		return doneMsg{text: fmt.Sprintf("opened PR #%d in browser", pr.Number)}
+	}
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -261,6 +272,16 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if wt, ok := m.selected(); ok {
 			m.setMsg("", nil)
 			return m, editorCmd(wt.Path)
+		}
+	case "p":
+		if wt, ok := m.selected(); ok {
+			p := m.prs[wt.Branch]
+			if p.Number == 0 {
+				m.setMsg("", errors.New("no pull request linked to this worktree"))
+				break
+			}
+			m.setMsg("", nil)
+			return m, openPRCmd(p)
 		}
 	case "n":
 		m.mode, m.focus, m.inputs = modeNew, 0, newInputs()
