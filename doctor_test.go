@@ -1,0 +1,72 @@
+package main
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestExistingAncestor(t *testing.T) {
+	dir := t.TempDir()
+	if got := existingAncestor(dir); got != dir {
+		t.Errorf("existing dir: got %q, want %q", got, dir)
+	}
+	deep := filepath.Join(dir, "a", "b", "c")
+	if got := existingAncestor(deep); got != dir {
+		t.Errorf("missing dir: got %q, want %q", got, dir)
+	}
+	if got := existingAncestor("/nope/nowhere"); got != "/" {
+		t.Errorf("absent path: got %q, want %q", got, "/")
+	}
+}
+
+// A check can only depend on one listed above it, or the skip never triggers.
+func TestChecksDependOnEarlierChecks(t *testing.T) {
+	seen := map[string]bool{}
+	for _, c := range checks {
+		if c.needs != "" && !seen[c.needs] {
+			t.Errorf("check %q needs %q, which is not defined before it", c.name, c.needs)
+		}
+		seen[c.name] = true
+	}
+}
+
+// A file we cannot look at is a different problem from one that is not there,
+// and doctor exists to tell them apart.
+func TestCheckShellSeparatesMissingFromUnreadable(t *testing.T) {
+	locked := filepath.Join(t.TempDir(), "locked")
+	if err := os.Mkdir(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+
+	shell := filepath.Join(locked, "sh")
+	if _, err := os.Stat(shell); errors.Is(err, os.ErrNotExist) {
+		t.Skip("stat sees through a 000 directory — running as root?")
+	}
+	t.Setenv("SHELL", shell)
+	_, err := checkShell()
+	if err == nil || !strings.Contains(err.Error(), "unreadable") {
+		t.Errorf("unreadable shell: got %v, want an unreadable error", err)
+	}
+
+	t.Setenv("SHELL", filepath.Join(t.TempDir(), "nope"))
+	if _, err := checkShell(); err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Errorf("missing shell: got %v, want a does-not-exist error", err)
+	}
+}
+
+// Every check must say something, whether it passes or fails.
+func TestChecksSayWhy(t *testing.T) {
+	for _, c := range checks {
+		detail, err := c.run()
+		if err == nil && detail == "" {
+			t.Errorf("check %q passed with no detail", c.name)
+		}
+		if err != nil && err.Error() == "" {
+			t.Errorf("check %q failed with no reason", c.name)
+		}
+	}
+}

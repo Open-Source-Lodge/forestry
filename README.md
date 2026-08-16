@@ -18,6 +18,7 @@ forestry                            start interactive mode
 forestry list                       list the worktrees of this repo
 forestry new <name> [--from <ref>]  create a worktree on branch <name>
 forestry remove <name> [--force]    remove a worktree
+forestry doctor                     check that everything forestry needs works
 forestry help                       show help
 ```
 
@@ -60,9 +61,16 @@ this is how you get *into* a worktree rather than just at it.
 `$FORESTRY_EDITOR`, then `editor` from the config file, then `$VISUAL`, then
 `$EDITOR` — the first one set wins, and each may carry arguments:
 
+```sh
+export FORESTRY_EDITOR="code -n"   # or "zed", "nvim", "subl -n", "idea"
+```
+
 ```toml
 editor = "code -n"
 ```
+
+The value is the command to run, not a path to a file: forestry splits it on
+spaces and appends the worktree directory, so `code -n` runs `code -n <path>`.
 
 A terminal editor keeps the screen until you leave it; a windowed one like VS
 Code opens and drops you straight back at the list.
@@ -108,6 +116,44 @@ remove a worktree with uncommitted changes unless you pass `--force`. The branch
 itself is left alone — delete it with `git branch -d <name>` if you want it gone.
 
 The main worktree can never be removed.
+
+### doctor
+
+`forestry doctor` checks everything forestry depends on and says what is wrong
+when something is:
+
+```
+✓ git             git version 2.50.1
+✓ repository      ~/github/myrepo
+✓ worktrees       3 listed, all present
+✓ worktree root   ~/github/myrepo-worktrees
+✓ config          ~/.config/forestry/config.toml: root=~/worktrees
+! github          gh not on PATH — pull request column falls back to local merge detection
+✓ merge fallback  origin/main
+✓ shell           /bin/zsh
+! editor          no editor set — e does nothing; set FORESTRY_EDITOR, VISUAL or EDITOR
+```
+
+`✗` is a failure: forestry cannot work until it is fixed, and the exit status is
+non-zero. `!` is a warning: that one feature is degraded, everything else works,
+and the exit status stays zero. The github check runs the real `gh pr list`
+call the pull request column uses, so it catches an expired login too.
+
+Checks build on each other: no `git` means no repository, and no repository
+means nothing to ask about worktrees or pull requests. A check whose
+prerequisite failed is skipped with `-` rather than run, so one broken thing
+reports one failure instead of restating itself in each tool's own words.
+
+## Contributing
+
+**Every new feature gets a doctor check.** If a feature depends on anything
+outside the process — a binary on `PATH`, an environment variable, a directory
+forestry writes to, a network call — add an entry to the `checks` table in
+`doctor.go` and a line to the sample output above. Fail the check when forestry
+breaks without it, warn when only that feature degrades, and set `needs` to the
+check it builds on so a shared cause is reported once. That way `forestry
+doctor` stays an honest answer to "does everything work?" instead of drifting
+into a list of the things that mattered in 2025.
 
 ## Where worktrees go
 
