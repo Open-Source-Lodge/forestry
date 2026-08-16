@@ -1,34 +1,35 @@
 # forestry
 
-A small terminal UI and CLI for managing git worktrees. It shells out to plain
-`git` commands — there is no state of its own, so anything you do with
-`git worktree` directly stays visible to forestry, and vice versa.
+Forestry is a terminal user interface and a command line tool. It manages git
+worktrees. Forestry sends commands to the `git` program and keeps no data of
+its own. Thus forestry shows the worktrees that you make with `git worktree`,
+and `git worktree` shows the worktrees that you make with forestry.
 
 ## Install
 
 ```sh
-make build                                              # then move bin/forestry onto your PATH
+make build                                              # then move bin/forestry into a directory on your PATH
 go install github.com/Open-Source-Lodge/forestry@latest
 ```
 
-## Usage
+## Commands
 
 ```
 forestry                            start interactive mode
-forestry list                       list the worktrees of this repo
-forestry new <name> [--from <ref>]  create a worktree on branch <name>
-forestry pr <number>                create a worktree from a pull request
+forestry list                       list the worktrees of this repository
+forestry new <name> [--from <ref>]  make a worktree on branch <name>
+forestry pr <number>                make a worktree from a pull request
 forestry remove <name> [--force]    remove a worktree
-forestry doctor                     check that everything forestry needs works
-forestry help                       show help
+forestry doctor                     make sure that forestry can operate
+forestry help                       show the help
 ```
 
-`*` in `list` output marks the worktree you are currently in.
+In the output of `list`, the `*` mark shows the worktree that you are in.
 
 ## Interactive mode
 
-Run `forestry` with no arguments to browse the worktrees and act on the
-selected one:
+Start `forestry` with no arguments to see the worktrees. Then do an operation
+on the worktree that you select:
 
 ```
   forestry · myrepo
@@ -40,27 +41,31 @@ selected one:
   ↑↓ move · enter shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit
 ```
 
-| key           | action                                                |
-| ------------- | ----------------------------------------------------- |
-| `↑` `↓` `k` `j` | move the selection                                  |
-| `g` `G`       | jump to the first / last worktree                     |
-| `enter`       | open a shell in the selected worktree                 |
-| `e`           | open the selected worktree in your editor             |
-| `n`           | create a worktree (branch name, optional base ref)    |
-| `P`           | pick an open pull request, or type its number          |
-| `p`           | open the selected worktree's pull request in a browser |
-| `d`           | remove the selected worktree, with a confirmation     |
-| `r`           | reload the list                                       |
-| `q` `esc`     | quit                                                  |
+| key             | operation                                            |
+| --------------- | ---------------------------------------------------- |
+| `↑` `↓` `k` `j` | move the selection                                   |
+| `g` `G`         | go to the first or the last worktree                 |
+| `enter`         | open a shell in the selected worktree                |
+| `e`             | open the selected worktree in your editor            |
+| `n`             | make a worktree                                      |
+| `P`             | select an open pull request, or type its number      |
+| `p`             | open the pull request of the worktree in a browser   |
+| `d`             | remove the selected worktree, after a confirmation   |
+| `r`             | read the list again                                  |
+| `q` `esc`       | stop forestry                                        |
 
-`•` marks the worktree you are currently in, and the selection starts there.
+The `•` mark shows the worktree that you are in. The selection starts at that
+worktree.
 
-`enter` closes the TUI, then runs `$SHELL` with its working directory set to
-the worktree and `FORESTRY_WORKTREE` pointing at it.
+The `enter` key closes the interface. Then forestry starts `$SHELL` in the
+directory of the worktree. The `FORESTRY_WORKTREE` variable contains the path
+to that worktree.
 
-`e` runs your editor with the worktree directory as its argument. The editor is
-`$FORESTRY_EDITOR`, then `editor` from the config file, then `$VISUAL`, then
-`$EDITOR` — the first one set wins, and each may carry arguments:
+The `e` key starts your editor. Forestry gives the directory of the worktree
+to the editor as an argument. Forestry looks for the editor in this sequence:
+`$FORESTRY_EDITOR`, then `editor` in the configuration file, then `$VISUAL`,
+then `$EDITOR`. Forestry uses the first one that has a value. Each one can
+include arguments:
 
 ```sh
 export FORESTRY_EDITOR="code -n"   # or "zed", "nvim", "subl -n", "idea"
@@ -70,65 +75,74 @@ export FORESTRY_EDITOR="code -n"   # or "zed", "nvim", "subl -n", "idea"
 editor = "code -n"
 ```
 
-The value is the command to run, not a path to a file: forestry splits it on
-spaces and appends the worktree directory, so `code -n` runs `code -n <path>`.
+The value is a command, not a path to a file. Forestry divides the value at
+the spaces. Then forestry adds the directory of the worktree. Thus `code -n`
+becomes the command `code -n <path>`.
 
-A terminal editor keeps the screen until you leave it; a windowed one like VS
-Code opens and drops you straight back at the list.
+A terminal editor keeps the screen until you close the editor. An editor with
+its own window opens, and forestry shows the list again immediately.
 
-`d` asks before removing. Git refuses to remove a worktree with uncommitted
-changes, so the confirmation offers `f` to force it.
+The `d` key asks you before it removes the worktree. Git does not remove a
+worktree that has changes that you did not commit. Push `f` at the
+confirmation to force the removal.
 
 ### Pull requests
 
-The column after the status shows the pull request of the worktree's branch —
-`merged`, `open`, `draft` or `closed`, with its number. `merged` is the
-interesting one: the work has landed, so the worktree is a candidate for `d`.
+The column after the status shows the pull request for the branch of the
+worktree. The status of the pull request is `merged`, `open`, `draft` or
+`closed`, with the number of the pull request. When the status is `merged`,
+the work is in the default branch. Thus you can remove that worktree with the
+`d` key.
 
-This comes from the [GitHub CLI](https://cli.github.com), and needs `gh` on your
-PATH and logged in. Since that means a network call, the list appears first and
-the column fills in a moment later.
+This data comes from the [GitHub CLI](https://cli.github.com). Install `gh` in
+a directory on your PATH, and log in. The `gh` program makes a network
+connection. Thus forestry shows the list first, and adds the column a moment
+later.
 
-Without `gh`, forestry falls back to asking git whether the branch is contained
-in the default branch, and shows `merged` when it is. That needs no network but
-only sees real merges — a squashed or rebased pull request leaves no trace of
-the branch in history, so it goes unnoticed. Repositories with no remote at all
-get an empty column.
+Without `gh`, forestry asks git if the default branch contains the branch. If
+the default branch contains the branch, forestry shows `merged`. This
+alternative method makes no network connection, but it finds only true merges.
+A squash merge or a rebase merge removes all record of the branch from the
+history. Thus forestry does not find these merges. For a repository with no
+remote, the column stays empty.
 
 ### new
 
-`forestry new <name>` creates branch `<name>` from the current `HEAD` and checks
-it out in a new worktree. Use `--from <ref>` to branch from somewhere else:
+The `forestry new <name>` command makes the branch `<name>` from the current
+`HEAD`. Then it checks out that branch in a new worktree. Use `--from <ref>`
+to make the branch from a different location:
 
 ```sh
-forestry new feat/login              # branch from HEAD
-forestry new hotfix --from v1.2.0    # branch from a tag
+forestry new feat/login              # make the branch from HEAD
+forestry new hotfix --from v1.2.0    # make the branch from a tag
 forestry new hotfix --from origin/main
-forestry new existing-branch         # no --from and branch exists → check it out
+forestry new existing-branch         # no --from, and the branch exists: check it out
 ```
 
-Branch names may contain slashes; the directory name flattens them, so
-`feat/login` lives in a directory called `feat-login`.
+A branch name can contain slashes. In the name of the directory, forestry
+replaces each slash with a hyphen. Thus the branch `feat/login` uses the
+directory `feat-login`.
 
 ### pr
 
-`forestry pr <number>` checks the head branch of a pull request out in a new
-worktree:
+The `forestry pr <number>` command checks out the head branch of a pull
+request in a new worktree:
 
 ```sh
 forestry pr 42
 forestry pr '#42'
 ```
 
-The branch name comes from `gh`, and the branch itself is fetched from
-`pull/<number>/head` when it is not already local — so pull requests opened from
-a fork work the same as ones from a branch in the repository. An existing local
-branch of that name is checked out as it is, never fetched over.
+The name of the branch comes from `gh`. If the branch is not local, forestry
+gets the branch from `pull/<number>/head`. Thus a pull request from a fork
+operates in the same manner as a pull request from a branch in the repository.
+If a local branch with that name exists, forestry checks out that local branch
+and gets no data from the remote.
 
-### the pull request picker
+### The list of pull requests
 
-`P` in interactive mode lists the open pull requests, most recently updated
-first, eight to a page:
+The `P` key in interactive mode shows the open pull requests. The most
+recently changed pull request is first. Each page shows eight pull requests:
 
 ```
   Worktree from pull request
@@ -144,23 +158,28 @@ first, eight to a page:
   ↑↓ pick · ←→ page · type a number · enter create · esc cancel
 ```
 
-`↑↓` moves, `←→` (or `pgup`/`pgdn`) jumps a page, and `enter` checks the
-selected one out. Typing a number wins over the selection, so a pull request
-the list does not offer — a closed one, or one past the 200 gh returns — still
-works. Without `gh` the picker says why it is empty and the number still does.
+The `↑↓` keys move the selection. The `←→` keys, or the `pgup` and `pgdn`
+keys, move one page. The `enter` key checks out the selected pull request. A
+number that you type has precedence over the selection. Thus you can also use
+a pull request that the list does not show. Examples are a closed pull
+request, or a pull request after the first 200 that `gh` supplies. Without
+`gh`, the list is empty and gives the reason. A number that you type continues
+to operate.
 
 ### remove
 
-`forestry remove <name>` takes the directory name shown by `list`. Git refuses to
-remove a worktree with uncommitted changes unless you pass `--force`. The branch
-itself is left alone — delete it with `git branch -d <name>` if you want it gone.
+The `forestry remove <name>` command uses the name of the directory that
+`list` shows. Git does not remove a worktree that has changes that you did not
+commit. Use the `--force` flag to remove such a worktree. Forestry does not
+remove the branch. To remove the branch, use the `git branch -d <name>`
+command.
 
-The main worktree can never be removed.
+Forestry cannot remove the main worktree.
 
 ### doctor
 
-`forestry doctor` checks everything forestry depends on and says what is wrong
-when something is:
+The `forestry doctor` command examines all the tools and the data that
+forestry uses. The command tells you which item has a fault:
 
 ```
 ✓ git             git version 2.50.1
@@ -175,44 +194,73 @@ when something is:
 ! editor          no editor set — e does nothing; set FORESTRY_EDITOR, VISUAL or EDITOR
 ```
 
-`✗` is a failure: forestry cannot work until it is fixed, and the exit status is
-non-zero. `!` is a warning: that one feature is degraded, everything else works,
-and the exit status stays zero. The github check runs the real `gh pr list`
-call the pull request column uses, so it catches an expired login too.
+The `✗` mark is a failure. Forestry cannot operate until you correct the
+failure, and the exit status is not zero. The `!` mark is a warning. Only one
+function is not fully available, all the other functions operate, and the exit
+status is zero. The github check makes the same `gh pr list` call as the pull
+request column. Thus the check also finds a login that is no longer valid.
 
-Checks build on each other: no `git` means no repository, and no repository
-means nothing to ask about worktrees or pull requests. A check whose
-prerequisite failed is skipped with `-` rather than run, so one broken thing
-reports one failure instead of restating itself in each tool's own words.
+A check can have a prerequisite check. Without `git`, forestry cannot find the
+repository. Without the repository, forestry cannot ask about worktrees or
+pull requests. If the prerequisite check fails, forestry does not do the
+check. Forestry shows the `-` mark for that check. Thus one fault causes one
+failure message, and not a message from each tool.
 
-## Contributing
+## Contribute
 
-The `Makefile` wraps the usual commands:
+The `Makefile` contains these commands:
 
-| command        | what it does                                |
+| command        | operation                                   |
 | -------------- | ------------------------------------------- |
 | `make`         | `vet`, `test` and `build`                   |
 | `make build`   | build `bin/forestry`                        |
 | `make run`     | `go run .`                                  |
 | `make test`    | `go test ./...`                             |
-| `make cover`   | tests with coverage, as CI runs them        |
+| `make cover`   | test with coverage, as CI does              |
 | `make vet`     | `go vet ./...`                              |
 | `make fmt`     | `go fmt ./...`                              |
 | `make install` | install into `$GOBIN`                       |
 | `make clean`   | remove `bin/`                               |
 
-**Every new feature gets a doctor check.** If a feature depends on anything
-outside the process — a binary on `PATH`, an environment variable, a directory
-forestry writes to, a network call — add an entry to the `checks` table in
-`doctor.go` and a line to the sample output above. Fail the check when forestry
-breaks without it, warn when only that feature degrades, and set `needs` to the
-check it builds on so a shared cause is reported once. That way `forestry
-doctor` stays an honest answer to "does everything work?" instead of drifting
-into a list of the things that mattered in 2025.
+**Add a doctor check for each new function.** A function can have a
+dependency outside of the process. Examples are a program on the `PATH`, an
+environment variable, a directory that forestry writes to, or a network
+connection. For each such dependency, add an entry to the `checks` table in
+`doctor.go`. Also add a line to the example output above. Make the check fail
+when forestry cannot operate without the dependency. Make the check give a
+warning when only one function is not fully available. Set `needs` to the
+prerequisite check. Then forestry reports a shared cause one time. Thus
+`forestry doctor` continues to tell you if all the functions operate.
 
-## Where worktrees go
+### Documentation rules
 
-By default, next to the repository, in `<repo>-worktrees/`:
+Write all documentation in this repository in ASD-STE100 Simplified Technical
+English. These are the primary rules:
+
+- Use the words from the STE dictionary. Technical names, such as `worktree`,
+  `branch` and `commit`, are permitted.
+- Give one meaning to each word. Do not use a word as a noun and as a verb.
+- Use the same word for the same thing in all the documents.
+- Write short sentences. Use a maximum of 20 words in an instruction, and a
+  maximum of 25 words in a description.
+- Write one instruction in one sentence.
+- Use the active voice. Do not use the passive voice.
+- Use the simple present tense, the simple past tense or the simple future
+  tense.
+- Do not use the `-ing` form of a verb, unless it is part of a technical name.
+- Use the articles `the`, `a` and `an` where possible.
+- Do not remove words to make a sentence shorter.
+- Write a maximum of six sentences in a paragraph.
+- Write about one topic in one paragraph.
+- Do not use contractions, idioms, slang or jargon.
+- Do not use words from a different language.
+
+Text in a code block shows the output of the program. Do not change that text
+in the documentation. Change the program first.
+
+## Where forestry puts the worktrees
+
+The default location is adjacent to the repository, in `<repo>-worktrees/`:
 
 ```
 ~/github/
@@ -222,25 +270,27 @@ By default, next to the repository, in `<repo>-worktrees/`:
     └── bugfix-123/
 ```
 
-This keeps worktrees out of the repository itself, so they never show up in
-`git status` or get picked up by editors and build tools.
+This location keeps the worktrees out of the repository. Thus `git status`
+does not show them, and editors and build tools do not read them.
 
-To collect every repo's worktrees under one directory instead, set a root in
-`~/.config/forestry/config.toml` (or `$XDG_CONFIG_HOME/forestry/config.toml`):
+To put the worktrees of all the repositories in one directory, set a root
+directory. Use the file `~/.config/forestry/config.toml`, or the file
+`$XDG_CONFIG_HOME/forestry/config.toml`:
 
 ```toml
 root = "~/worktrees"
 ```
 
-Worktrees are then namespaced per repository, so different repos can use the
-same branch name without colliding:
+Forestry then makes a directory for each repository. Thus two repositories can
+use the same branch name:
 
 ```
 ~/worktrees/myrepo/feat-login
 ~/worktrees/otherrepo/feat-login
 ```
 
-`FORESTRY_ROOT` overrides the config file, which is handy for one-off runs:
+The `FORESTRY_ROOT` variable has precedence over the configuration file. Use
+this variable for one run:
 
 ```sh
 FORESTRY_ROOT=/tmp/scratch forestry new experiment
