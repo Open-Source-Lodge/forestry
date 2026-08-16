@@ -94,6 +94,10 @@ func checkWorktrees() (string, error) {
 	var missing []string
 	for _, wt := range list {
 		if _, err := os.Stat(wt.Path); err != nil {
+			// Only a gone directory means prune; anything else is its own problem.
+			if !errors.Is(err, os.ErrNotExist) {
+				return "", fmt.Errorf("%s is unreadable: %v", wt.Name(), err)
+			}
 			missing = append(missing, wt.Name())
 		}
 	}
@@ -142,6 +146,9 @@ func checkConfig() (string, error) {
 		return "", errors.New("no home directory — config file cannot be found")
 	}
 	if _, err := os.Stat(path); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("%s is unreadable: %v — forestry ignores it in silence", tilde(path), err)
+		}
 		return tilde(path) + " (none, using defaults)", nil
 	}
 	var set []string
@@ -188,6 +195,9 @@ func checkShell() (string, error) {
 		return "", errors.New("$SHELL unset — enter opens /bin/sh")
 	}
 	if _, err := os.Stat(sh); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("$SHELL is %s, which is unreadable: %v", sh, err)
+		}
 		return "", fmt.Errorf("$SHELL is %s, which does not exist", sh)
 	}
 	return sh, nil

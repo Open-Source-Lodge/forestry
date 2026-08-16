@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -27,6 +30,31 @@ func TestChecksDependOnEarlierChecks(t *testing.T) {
 			t.Errorf("check %q needs %q, which is not defined before it", c.name, c.needs)
 		}
 		seen[c.name] = true
+	}
+}
+
+// A file we cannot look at is a different problem from one that is not there,
+// and doctor exists to tell them apart.
+func TestCheckShellSeparatesMissingFromUnreadable(t *testing.T) {
+	locked := filepath.Join(t.TempDir(), "locked")
+	if err := os.Mkdir(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+
+	shell := filepath.Join(locked, "sh")
+	if _, err := os.Stat(shell); errors.Is(err, os.ErrNotExist) {
+		t.Skip("stat sees through a 000 directory — running as root?")
+	}
+	t.Setenv("SHELL", shell)
+	_, err := checkShell()
+	if err == nil || !strings.Contains(err.Error(), "unreadable") {
+		t.Errorf("unreadable shell: got %v, want an unreadable error", err)
+	}
+
+	t.Setenv("SHELL", filepath.Join(t.TempDir(), "nope"))
+	if _, err := checkShell(); err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Errorf("missing shell: got %v, want a does-not-exist error", err)
 	}
 }
 
