@@ -10,6 +10,7 @@ import (
 type PR struct {
 	Number int
 	State  string // open, draft, merged or closed
+	URL    string
 }
 
 // Label is what the list shows for the pull request.
@@ -33,7 +34,7 @@ func pullRequests(branches []string) map[string]PR {
 
 func ghPullRequests() (map[string]PR, error) {
 	out, err := command("gh", "pr", "list", "--state", "all", "--limit", "200",
-		"--json", "number,state,isDraft,headRefName")
+		"--json", "number,state,isDraft,headRefName,url")
 	if err != nil {
 		return nil, err
 	}
@@ -42,6 +43,7 @@ func ghPullRequests() (map[string]PR, error) {
 		State       string
 		IsDraft     bool
 		HeadRefName string
+		URL         string
 	}
 	if err := json.Unmarshal([]byte(out), &list); err != nil {
 		return nil, err
@@ -56,7 +58,7 @@ func ghPullRequests() (map[string]PR, error) {
 		if cur, ok := prs[p.HeadRefName]; ok && rank(cur.State) >= rank(state) {
 			continue
 		}
-		prs[p.HeadRefName] = PR{Number: p.Number, State: state}
+		prs[p.HeadRefName] = PR{Number: p.Number, State: state, URL: p.URL}
 	}
 	return prs, nil
 }

@@ -44,7 +44,8 @@ func git(args ...string) (string, error) {
 	return command("git", args...)
 }
 
-func command(name string, args ...string) (string, error) {
+// command is a var so tests can stand in for the real process.
+var command = func(name string, args ...string) (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = &stdout
