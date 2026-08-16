@@ -17,6 +17,7 @@ go install github.com/Open-Source-Lodge/forestry@latest
 forestry                            start interactive mode
 forestry list                       list the worktrees of this repo
 forestry new <name> [--from <ref>]  create a worktree on branch <name>
+forestry pr <number>                create a worktree from a pull request
 forestry remove <name> [--force]    remove a worktree
 forestry doctor                     check that everything forestry needs works
 forestry help                       show help
@@ -36,7 +37,7 @@ selected one:
     bugfix-123  bugfix-123  clean    merged #7  ~/github/myrepo-worktrees/bugfix-123
     feat-login  feat/login  dirty    open #12   ~/github/myrepo-worktrees/feat-login
 
-  ↑↓ move · enter shell · e editor · n new · d remove · r refresh · q quit
+  ↑↓ move · enter shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit
 ```
 
 | key           | action                                                |
@@ -46,6 +47,8 @@ selected one:
 | `enter`       | open a shell in the selected worktree                 |
 | `e`           | open the selected worktree in your editor             |
 | `n`           | create a worktree (branch name, optional base ref)    |
+| `P`           | pick an open pull request, or type its number          |
+| `p`           | open the selected worktree's pull request in a browser |
 | `d`           | remove the selected worktree, with a confirmation     |
 | `r`           | reload the list                                       |
 | `q` `esc`     | quit                                                  |
@@ -107,6 +110,45 @@ forestry new existing-branch         # no --from and branch exists → check it 
 Branch names may contain slashes; the directory name flattens them, so
 `feat/login` lives in a directory called `feat-login`.
 
+### pr
+
+`forestry pr <number>` checks the head branch of a pull request out in a new
+worktree:
+
+```sh
+forestry pr 42
+forestry pr '#42'
+```
+
+The branch name comes from `gh`, and the branch itself is fetched from
+`pull/<number>/head` when it is not already local — so pull requests opened from
+a fork work the same as ones from a branch in the repository. An existing local
+branch of that name is checked out as it is, never fetched over.
+
+### the pull request picker
+
+`P` in interactive mode lists the open pull requests, most recently updated
+first, eight to a page:
+
+```
+  Worktree from pull request
+
+  #42   2026-08-14  Add worktrees from pull requests
+❯ #41   2026-08-12  Bump bubbletea
+  #7    2026-07-30  Fix doctor skip logic
+
+  page 1/3 · 21 open
+
+  number
+
+  ↑↓ pick · ←→ page · type a number · enter create · esc cancel
+```
+
+`↑↓` moves, `←→` (or `pgup`/`pgdn`) jumps a page, and `enter` checks the
+selected one out. Typing a number wins over the selection, so a pull request
+the list does not offer — a closed one, or one past the 200 gh returns — still
+works. Without `gh` the picker says why it is empty and the number still does.
+
 ### remove
 
 `forestry remove <name>` takes the directory name shown by `list`. Git refuses to
@@ -128,6 +170,7 @@ when something is:
 ✓ config          ~/.config/forestry/config.toml: root=~/worktrees
 ! github          gh not on PATH — pull request column falls back to local merge detection
 ✓ merge fallback  origin/main
+✓ pull refs       git@github.com:me/myrepo.git
 ✓ shell           /bin/zsh
 ! editor          no editor set — e does nothing; set FORESTRY_EDITOR, VISUAL or EDITOR
 ```

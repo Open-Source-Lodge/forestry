@@ -76,6 +76,18 @@ func cmdNew(args []string) error {
 	return nil
 }
 
+func cmdPR(args []string) error {
+	if len(args) != 1 {
+		return errors.New("usage: forestry pr <number>")
+	}
+	path, err := createFromPR(args[0])
+	if err != nil {
+		return err
+	}
+	fmt.Println(path)
+	return nil
+}
+
 // createWorktree checks branch name out in a fresh worktree and returns its path.
 func createWorktree(name, from string) (string, error) {
 	if err := validName(name); err != nil {
