@@ -12,6 +12,7 @@ Usage:
   forestry list                       list the worktrees of this repo
   forestry new <name> [--from <ref>]  create a worktree on branch <name>
   forestry remove <name> [--force]    remove a worktree
+  forestry doctor                     check that everything forestry needs works
   forestry help                       show this help
 
 New branches are created from HEAD unless --from is given.
@@ -40,6 +41,8 @@ func dispatch(cmd string, args []string) error {
 		return cmdNew(args)
 	case "remove", "rm":
 		return cmdRemove(args)
+	case "doctor":
+		return cmdDoctor(args)
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 		return nil
