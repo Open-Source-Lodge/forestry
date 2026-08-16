@@ -52,10 +52,8 @@ selected one:
 
 `•` marks the worktree you are currently in, and the selection starts there.
 
-`enter` runs `$SHELL` with its working directory set to the worktree and
-`FORESTRY_WORKTREE` pointing at it; leave the shell and you are back at the
-list. A program cannot change the directory of the shell that started it, so
-this is how you get *into* a worktree rather than just at it.
+`enter` closes the TUI, then runs `$SHELL` with its working directory set to
+the worktree and `FORESTRY_WORKTREE` pointing at it.
 
 `e` runs your editor with the worktree directory as its argument. The editor is
 `$FORESTRY_EDITOR`, then `editor` from the config file, then `$VISUAL`, then
