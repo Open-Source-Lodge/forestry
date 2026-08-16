@@ -89,3 +89,36 @@ func TestListHelpMentionsPR(t *testing.T) {
 		t.Errorf("list help does not mention the key: %q", listHelp)
 	}
 }
+
+func TestPRLabel(t *testing.T) {
+	tests := []struct {
+		pr   PR
+		want string
+	}{
+		{PR{Number: 0, State: ""}, ""},
+		{PR{Number: 0, State: "merged"}, "merged"},
+		{PR{Number: 42, State: "open"}, "open #42"},
+		{PR{Number: 7, State: "draft"}, "draft #7"},
+		{PR{Number: 1, State: "closed"}, "closed #1"},
+	}
+	for _, tt := range tests {
+		if got := tt.pr.Label(); got != tt.want {
+			t.Errorf("PR%+v.Label() = %q, want %q", tt.pr, got, tt.want)
+		}
+	}
+}
+
+func TestRank(t *testing.T) {
+	if rank("merged") <= rank("open") {
+		t.Error("merged should outrank open")
+	}
+	if rank("open") != rank("draft") {
+		t.Error("open and draft should have equal rank")
+	}
+	if rank("open") <= rank("closed") {
+		t.Error("open should outrank closed")
+	}
+	if rank("closed") != rank("unknown") {
+		t.Error("closed and unknown state should have equal rank")
+	}
+}

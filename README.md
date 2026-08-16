@@ -7,7 +7,7 @@ A small terminal UI and CLI for managing git worktrees. It shells out to plain
 ## Install
 
 ```sh
-go build -o bin/forestry .    # then move it onto your PATH
+make build                                              # then move bin/forestry onto your PATH
 go install github.com/Open-Source-Lodge/forestry@latest
 ```
 
@@ -145,6 +145,20 @@ prerequisite failed is skipped with `-` rather than run, so one broken thing
 reports one failure instead of restating itself in each tool's own words.
 
 ## Contributing
+
+The `Makefile` wraps the usual commands:
+
+| command        | what it does                                |
+| -------------- | ------------------------------------------- |
+| `make`         | `vet`, `test` and `build`                   |
+| `make build`   | build `bin/forestry`                        |
+| `make run`     | `go run .`                                  |
+| `make test`    | `go test ./...`                             |
+| `make cover`   | tests with coverage, as CI runs them        |
+| `make vet`     | `go vet ./...`                              |
+| `make fmt`     | `go fmt ./...`                              |
+| `make install` | install into `$GOBIN`                       |
+| `make clean`   | remove `bin/`                               |
 
 **Every new feature gets a doctor check.** If a feature depends on anything
 outside the process — a binary on `PATH`, an environment variable, a directory

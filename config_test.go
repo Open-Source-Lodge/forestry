@@ -1,0 +1,132 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestExpandHome(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine home dir:", err)
+	}
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"~", home},
+		{"~/foo/bar", filepath.Join(home, "foo/bar")},
+		{"/absolute/path", "/absolute/path"},
+		{"relative", "relative"},
+		{"~other/path", "~other/path"},
+	}
+	for _, tt := range tests {
+		got := expandHome(tt.in)
+		if got != tt.want {
+			t.Errorf("expandHome(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestWorktreeRoot(t *testing.T) {
+	t.Cleanup(func() { os.Unsetenv("FORESTRY_ROOT") })
+
+	// Default: sibling directory named <repo>-worktrees.
+	os.Unsetenv("FORESTRY_ROOT")
+	got := worktreeRoot("/home/user/myrepo")
+	want := "/home/user/myrepo-worktrees"
+	if got != want {
+		t.Errorf("worktreeRoot default = %q, want %q", got, want)
+	}
+
+	// FORESTRY_ROOT override.
+	os.Setenv("FORESTRY_ROOT", "/mnt/worktrees")
+	got = worktreeRoot("/home/user/myrepo")
+	want = "/mnt/worktrees/myrepo"
+	if got != want {
+		t.Errorf("worktreeRoot FORESTRY_ROOT = %q, want %q", got, want)
+	}
+}
+
+func TestConfigValue(t *testing.T) {
+	dir := t.TempDir()
+	cfgFile := filepath.Join(dir, "config.toml")
+
+	content := `# forestry config
+root = /mnt/worktrees
+editor = "vim -p"
+# another comment
+empty =
+`
+	if err := os.WriteFile(cfgFile, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Point configPath() to our temp file by overriding XDG_CONFIG_HOME.
+	// configPath() uses XDG_CONFIG_HOME and appends "forestry/config.toml".
+	os.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".."))
+	// Our file is at dir/config.toml, but configPath() will look for
+	// <XDG_CONFIG_HOME>/forestry/config.toml.  Recreate the expected layout.
+	cfgDir := filepath.Join(dir, "forestry")
+	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	os.Setenv("XDG_CONFIG_HOME", dir)
+	t.Cleanup(func() { os.Unsetenv("XDG_CONFIG_HOME") })
+
+	tests := []struct {
+		key  string
+		want string
+	}{
+		{"root", "/mnt/worktrees"},
+		{"editor", "vim -p"},
+		{"empty", ""},
+		{"missing", ""},
+	}
+	for _, tt := range tests {
+		got := configValue(tt.key)
+		if got != tt.want {
+			t.Errorf("configValue(%q) = %q, want %q", tt.key, got, tt.want)
+		}
+	}
+}
+
+func TestEditorCommand(t *testing.T) {
+	t.Cleanup(func() {
+		os.Unsetenv("FORESTRY_EDITOR")
+		os.Unsetenv("VISUAL")
+		os.Unsetenv("EDITOR")
+		os.Unsetenv("XDG_CONFIG_HOME")
+	})
+	os.Unsetenv("FORESTRY_EDITOR")
+	os.Unsetenv("VISUAL")
+	os.Unsetenv("EDITOR")
+	// Point config to empty dir so no config file exists.
+	os.Setenv("XDG_CONFIG_HOME", t.TempDir())
+
+	if got := editorCommand(); got != nil {
+		t.Errorf("expected nil when no editor set, got %v", got)
+	}
+
+	os.Setenv("EDITOR", "nano")
+	got := editorCommand()
+	if len(got) != 1 || got[0] != "nano" {
+		t.Errorf("editorCommand with EDITOR=nano = %v, want [nano]", got)
+	}
+
+	os.Setenv("VISUAL", "code --wait")
+	got = editorCommand()
+	if len(got) != 2 || got[0] != "code" || got[1] != "--wait" {
+		t.Errorf("editorCommand with VISUAL='code --wait' = %v", got)
+	}
+
+	os.Setenv("FORESTRY_EDITOR", "nvim")
+	got = editorCommand()
+	if len(got) != 1 || got[0] != "nvim" {
+		t.Errorf("FORESTRY_EDITOR should take precedence, got %v", got)
+	}
+}
