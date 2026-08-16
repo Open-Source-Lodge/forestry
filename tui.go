@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -27,17 +28,22 @@ var (
 )
 
 const (
-	listHelp   = "↑↓ move · enter shell · e editor · n new · d remove · p open PR · r refresh · q quit"
+	listHelp   = "↑↓ move · enter shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit"
 	newHelp    = "tab next field · enter create · esc cancel"
+	prHelp     = "↑↓ pick · ←→ page · type a number · enter create · esc cancel"
 	removeHelp = "y remove · f force remove · esc cancel"
 	busyHelp   = "working · ctrl+c quit"
 )
 
 type mode int
 
+// prPageSize is how many pull requests the picker shows at a time.
+const prPageSize = 8
+
 const (
 	modeList mode = iota
 	modeNew
+	modePR
 	modeRemove
 )
 
@@ -50,6 +56,12 @@ type row struct {
 type rowsMsg struct {
 	rows    []row
 	current string
+}
+
+// openPRsMsg carries the pull requests the picker offers, or why there are none.
+type openPRsMsg struct {
+	list []openPR
+	err  error
 }
 
 // prsMsg carries the pull request state of the branches, keyed by branch name.
@@ -78,6 +90,10 @@ type model struct {
 	busy     string
 	busyPath string
 	spinner  spinner.Model
+	// picker state for modePR: the open pull requests, nil until they land.
+	prList   []openPR
+	prCursor int
+	prErr    string
 	// want is a path to move the cursor onto once the list reloads.
 	want   string
 	width  int
@@ -122,6 +138,21 @@ func loadPRs(rows []row) tea.Cmd {
 func createCmd(name, from string) tea.Cmd {
 	return func() tea.Msg {
 		path, err := createWorktree(name, from)
+		if err != nil {
+			return doneMsg{err: err}
+		}
+		return doneMsg{text: "created " + filepath.Base(path), path: path}
+	}
+}
+
+func loadOpenPRs() tea.Msg {
+	list, err := openPRs()
+	return openPRsMsg{list: list, err: err}
+}
+
+func createFromPRCmd(number string) tea.Cmd {
+	return func() tea.Msg {
+		path, err := createFromPR(number)
 		if err != nil {
 			return doneMsg{err: err}
 		}
@@ -207,6 +238,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case prsMsg:
 		m.prs = msg
 
+	case openPRsMsg:
+		m.prList = msg.list
+		if msg.err != nil {
+			m.prErr = msg.err.Error()
+		}
+
 	case doneMsg:
 		m.busy, m.busyPath = "", ""
 		m.setMsg(msg.text, msg.err)
@@ -227,13 +264,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.mode {
 		case modeNew:
 			return m.updateNew(msg)
+		case modePR:
+			return m.updatePR(msg)
 		case modeRemove:
 			return m.updateRemove(msg)
 		default:
 			return m.updateList(msg)
 		}
 	}
-	if m.mode == modeNew {
+	if m.mode == modeNew || m.mode == modePR {
 		return m.updateInputs(msg)
 	}
 	return m, nil
@@ -287,6 +326,11 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode, m.focus, m.inputs = modeNew, 0, newInputs()
 		m.setMsg("", nil)
 		return m, textinput.Blink
+	case "P":
+		m.mode, m.focus, m.inputs = modePR, 0, prInputs()
+		m.prList, m.prCursor, m.prErr = nil, 0, ""
+		m.setMsg("", nil)
+		return m, tea.Batch(textinput.Blink, loadOpenPRs)
 	case "d", "x":
 		wt, ok := m.selected()
 		if !ok {
@@ -328,6 +372,39 @@ func (m model) updateNew(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, textinput.Blink
+	}
+	return m.updateInputs(msg)
+}
+
+// updatePR drives the picker. What you type wins over what is selected, so a
+// number for a pull request the list does not offer still works.
+func (m model) updatePR(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "ctrl+c":
+		m.mode = modeList
+		return m, nil
+	case "up", "ctrl+p":
+		m.prCursor = max(0, m.prCursor-1)
+		return m, nil
+	case "down", "ctrl+n":
+		m.prCursor = min(len(m.prList)-1, m.prCursor+1)
+		return m, nil
+	case "left", "pgup":
+		m.prCursor = max(0, m.prCursor-prPageSize)
+		return m, nil
+	case "right", "pgdown":
+		m.prCursor = min(len(m.prList)-1, m.prCursor+prPageSize)
+		return m, nil
+	case "enter":
+		number := strings.TrimSpace(m.inputs[0].Value())
+		if number == "" {
+			if m.prCursor < 0 || m.prCursor >= len(m.prList) {
+				return m, nil
+			}
+			number = strconv.Itoa(m.prList[m.prCursor].Number)
+		}
+		m.mode = modeList
+		return m.start("checking out PR "+number, "", createFromPRCmd(number))
 	}
 	return m.updateInputs(msg)
 }
@@ -394,6 +471,15 @@ func newInputs() []textinput.Model {
 	return []textinput.Model{name, from}
 }
 
+func prInputs() []textinput.Model {
+	number := textinput.New()
+	number.Prompt = ""
+	number.Placeholder = "123"
+	number.Width = 40
+	number.Focus()
+	return []textinput.Model{number}
+}
+
 func (m model) View() string {
 	var b strings.Builder
 	b.WriteString("\n  " + titleStyle.Render("forestry") + dimStyle.Render(" · "+filepath.Base(m.repo)) + "\n\n")
@@ -402,6 +488,8 @@ func (m model) View() string {
 	switch m.mode {
 	case modeNew:
 		b.WriteString(m.newView())
+	case modePR:
+		b.WriteString(m.prView())
 	case modeRemove:
 		b.WriteString(m.removeView())
 	default:
@@ -487,6 +575,44 @@ func (m model) newView() string {
 	b.WriteString("  " + labelStyle.Render("branch") + m.inputs[0].View() + "\n")
 	b.WriteString("  " + labelStyle.Render("from") + m.inputs[1].View() + "\n\n")
 	b.WriteString("  " + dimStyle.Render(newHelp) + "\n")
+	return b.String()
+}
+
+func (m model) prView() string {
+	var b strings.Builder
+	b.WriteString("  " + titleStyle.Render("Worktree from pull request") + "\n\n")
+	b.WriteString(m.pickerView())
+	b.WriteString("  " + labelStyle.Render("number") + m.inputs[0].View() + "\n\n")
+	b.WriteString("  " + dimStyle.Render(prHelp) + "\n")
+	return b.String()
+}
+
+// pickerView shows one page of open pull requests around the selection.
+func (m model) pickerView() string {
+	switch {
+	case m.prErr != "":
+		return "  " + dirtyStyle.Render("gh could not list pull requests: "+m.prErr) + "\n\n"
+	case m.prList == nil:
+		return "  " + dimStyle.Render("loading open pull requests…") + "\n\n"
+	case len(m.prList) == 0:
+		return "  " + dimStyle.Render("no open pull requests") + "\n\n"
+	}
+	page := m.prCursor / prPageSize
+	start := page * prPageSize
+	end := min(start+prPageSize, len(m.prList))
+
+	var b strings.Builder
+	for i := start; i < end; i++ {
+		p := m.prList[i]
+		cursor, title := "  ", p.Title
+		if i == m.prCursor {
+			cursor, title = cursorStyle.Render("❯ "), pickedStyle.Render(title)
+		}
+		b.WriteString(cursor + okStyle.Render(fmt.Sprintf("#%-5d", p.Number)) +
+			dimStyle.Render(p.Date()) + "  " + title + "\n")
+	}
+	pages := (len(m.prList) + prPageSize - 1) / prPageSize
+	b.WriteString("\n  " + dimStyle.Render(fmt.Sprintf("page %d/%d · %d open", page+1, pages, len(m.prList))) + "\n\n")
 	return b.String()
 }
 

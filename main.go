@@ -11,6 +11,7 @@ Usage:
   forestry                            start interactive mode
   forestry list                       list the worktrees of this repo
   forestry new <name> [--from <ref>]  create a worktree on branch <name>
+  forestry pr <number>                create a worktree from a pull request
   forestry remove <name> [--force]    remove a worktree
   forestry doctor                     check that everything forestry needs works
   forestry help                       show this help
@@ -39,6 +40,8 @@ func dispatch(cmd string, args []string) error {
 		return cmdList(args)
 	case "new", "add":
 		return cmdNew(args)
+	case "pr":
+		return cmdPR(args)
 	case "remove", "rm":
 		return cmdRemove(args)
 	case "doctor":

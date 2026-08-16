@@ -23,6 +23,7 @@ var checks = []check{
 	{name: "config", run: checkConfig, warn: true},
 	{name: "github", run: checkGitHub, warn: true, needs: "repository"},
 	{name: "merge fallback", run: checkFallback, warn: true, needs: "repository"},
+	{name: "pull refs", run: checkPullRefs, warn: true, needs: "repository"},
 	{name: "shell", run: checkShell, warn: true},
 	{name: "editor", run: checkEditor, warn: true},
 }
@@ -187,6 +188,15 @@ func checkFallback() (string, error) {
 		return "", errors.New("no default branch — merged branches go unnoticed without gh")
 	}
 	return base, nil
+}
+
+// checkPullRefs verifies the remote `forestry pr` fetches pull request branches from.
+func checkPullRefs() (string, error) {
+	url, err := git("remote", "get-url", "origin")
+	if err != nil {
+		return "", errors.New("no remote named origin — `forestry pr` cannot fetch pull request branches")
+	}
+	return url, nil
 }
 
 func checkShell() (string, error) {

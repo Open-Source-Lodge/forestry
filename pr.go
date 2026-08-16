@@ -2,7 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -61,6 +64,69 @@ func ghPullRequests() (map[string]PR, error) {
 		prs[p.HeadRefName] = PR{Number: p.Number, State: state, URL: p.URL}
 	}
 	return prs, nil
+}
+
+// openPR is one entry of the pull request picker.
+type openPR struct {
+	Number      int
+	Title       string
+	HeadRefName string
+	UpdatedAt   string
+}
+
+// Date is the day the pull request last moved, as a bare yyyy-mm-dd.
+func (p openPR) Date() string {
+	day, _, _ := strings.Cut(p.UpdatedAt, "T")
+	return day
+}
+
+// openPRs lists the open pull requests, most recently updated first.
+func openPRs() ([]openPR, error) {
+	out, err := command("gh", "pr", "list", "--state", "open", "--limit", "200",
+		"--json", "number,title,headRefName,updatedAt")
+	if err != nil {
+		return nil, errors.New(firstLine(err.Error()))
+	}
+	list := []openPR{}
+	if err := json.Unmarshal([]byte(out), &list); err != nil {
+		return nil, err
+	}
+	// gh timestamps are RFC 3339 in UTC, so they sort as plain strings.
+	sort.Slice(list, func(i, j int) bool { return list[i].UpdatedAt > list[j].UpdatedAt })
+	return list, nil
+}
+
+// createFromPR checks the head branch of a pull request out in a new worktree.
+// The branch is fetched from the pull request ref when it is not already local,
+// which also works for pull requests opened from a fork.
+func createFromPR(number string) (string, error) {
+	number = strings.TrimPrefix(strings.TrimSpace(number), "#")
+	if n, err := strconv.Atoi(number); err != nil || n <= 0 {
+		return "", fmt.Errorf("invalid pull request number %q", number)
+	}
+	branch, err := prBranch(number)
+	if err != nil {
+		return "", err
+	}
+	if !branchExists(branch) {
+		// ponytail: assumes the remote is "origin"; read it off gh if that bites.
+		if _, err := git("fetch", "origin", "pull/"+number+"/head:"+branch); err != nil {
+			return "", err
+		}
+	}
+	return createWorktree(branch, "")
+}
+
+// prBranch is the head branch of a pull request, as gh reports it.
+func prBranch(number string) (string, error) {
+	out, err := command("gh", "pr", "view", number, "--json", "headRefName", "-q", ".headRefName")
+	if err != nil {
+		return "", fmt.Errorf("pull request #%s: %s", number, firstLine(err.Error()))
+	}
+	if out == "" {
+		return "", fmt.Errorf("pull request #%s has no head branch", number)
+	}
+	return out, nil
 }
 
 func rank(state string) int {
