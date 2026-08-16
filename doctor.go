@@ -13,15 +13,16 @@ import (
 // something outside the process — a binary on PATH, an environment variable, a
 // directory it writes to, a network call — gets a line here, so a new feature
 // means a new check. Return an error to fail; set warn when the feature only
-// degrades (forestry still works, just with less).
+// degrades (forestry still works, just with less), and set needs to the check
+// this one builds on, so one broken thing reports one failure.
 var checks = []check{
 	{name: "git", run: checkGit},
-	{name: "repository", run: checkRepo},
-	{name: "worktrees", run: checkWorktrees, needsRepo: true},
-	{name: "worktree root", run: checkRoot, needsRepo: true},
+	{name: "repository", run: checkRepo, needs: "git"},
+	{name: "worktrees", run: checkWorktrees, needs: "repository"},
+	{name: "worktree root", run: checkRoot, needs: "repository"},
 	{name: "config", run: checkConfig, warn: true},
-	{name: "github", run: checkGitHub, warn: true, needsRepo: true},
-	{name: "merge fallback", run: checkFallback, warn: true, needsRepo: true},
+	{name: "github", run: checkGitHub, warn: true, needs: "repository"},
+	{name: "merge fallback", run: checkFallback, warn: true, needs: "repository"},
 	{name: "shell", run: checkShell, warn: true},
 	{name: "editor", run: checkEditor, warn: true},
 }
@@ -31,9 +32,9 @@ type check struct {
 	name string
 	run  func() (string, error)
 	warn bool // a failure here degrades a feature rather than breaking forestry
-	// needsRepo skips the check outside a repository, where it would only
-	// repeat that one failure in the words of whatever tool it asked.
-	needsRepo bool
+	// needs names the check this one builds on. When that one failed, this is
+	// skipped rather than run to repeat the same cause in another tool's words.
+	needs string
 }
 
 func cmdDoctor(args []string) error {
@@ -41,13 +42,18 @@ func cmdDoctor(args []string) error {
 		return fmt.Errorf("doctor takes no arguments")
 	}
 	var failed int
-	_, repoErr := mainWorktree()
+	broken := map[string]bool{}
 	for _, c := range checks {
-		if c.needsRepo && repoErr != nil {
-			fmt.Printf("%s %-15s %s\n", dimStyle.Render("-"), c.name, dimStyle.Render("skipped — not in a git repository"))
+		if broken[c.needs] {
+			// Skipping proves nothing, so anything built on this one goes too.
+			broken[c.name] = true
+			fmt.Printf("%s %-15s %s\n", dimStyle.Render("-"), c.name, dimStyle.Render("skipped — needs "+c.needs))
 			continue
 		}
 		detail, err := c.run()
+		if err != nil {
+			broken[c.name] = true
+		}
 		switch {
 		case err == nil:
 			fmt.Printf("%s %-15s %s\n", okStyle.Render("✓"), c.name, dimStyle.Render(detail))

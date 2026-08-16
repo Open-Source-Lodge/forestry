@@ -19,6 +19,17 @@ func TestExistingAncestor(t *testing.T) {
 	}
 }
 
+// A check can only depend on one listed above it, or the skip never triggers.
+func TestChecksDependOnEarlierChecks(t *testing.T) {
+	seen := map[string]bool{}
+	for _, c := range checks {
+		if c.needs != "" && !seen[c.needs] {
+			t.Errorf("check %q needs %q, which is not defined before it", c.name, c.needs)
+		}
+		seen[c.name] = true
+	}
+}
+
 // Every check must say something, whether it passes or fails.
 func TestChecksSayWhy(t *testing.T) {
 	for _, c := range checks {

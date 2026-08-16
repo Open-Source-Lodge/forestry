@@ -139,8 +139,10 @@ non-zero. `!` is a warning: that one feature is degraded, everything else works,
 and the exit status stays zero. The github check runs the real `gh pr list`
 call the pull request column uses, so it catches an expired login too.
 
-Outside a git repository the checks that need one are skipped with `-`, so the
-output names the one cause rather than repeating it per check.
+Checks build on each other: no `git` means no repository, and no repository
+means nothing to ask about worktrees or pull requests. A check whose
+prerequisite failed is skipped with `-` rather than run, so one broken thing
+reports one failure instead of restating itself in each tool's own words.
 
 ## Contributing
 
@@ -148,7 +150,8 @@ output names the one cause rather than repeating it per check.
 outside the process — a binary on `PATH`, an environment variable, a directory
 forestry writes to, a network call — add an entry to the `checks` table in
 `doctor.go` and a line to the sample output above. Fail the check when forestry
-breaks without it, warn when only that feature degrades. That way `forestry
+breaks without it, warn when only that feature degrades, and set `needs` to the
+check it builds on so a shared cause is reported once. That way `forestry
 doctor` stays an honest answer to "does everything work?" instead of drifting
 into a list of the things that mattered in 2025.
 
