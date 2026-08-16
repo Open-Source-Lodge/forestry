@@ -17,11 +17,11 @@ import (
 var checks = []check{
 	{name: "git", run: checkGit},
 	{name: "repository", run: checkRepo},
-	{name: "worktrees", run: checkWorktrees},
-	{name: "worktree root", run: checkRoot},
+	{name: "worktrees", run: checkWorktrees, needsRepo: true},
+	{name: "worktree root", run: checkRoot, needsRepo: true},
 	{name: "config", run: checkConfig, warn: true},
-	{name: "github", run: checkGitHub, warn: true},
-	{name: "merge fallback", run: checkFallback, warn: true},
+	{name: "github", run: checkGitHub, warn: true, needsRepo: true},
+	{name: "merge fallback", run: checkFallback, warn: true, needsRepo: true},
 	{name: "shell", run: checkShell, warn: true},
 	{name: "editor", run: checkEditor, warn: true},
 }
@@ -31,6 +31,9 @@ type check struct {
 	name string
 	run  func() (string, error)
 	warn bool // a failure here degrades a feature rather than breaking forestry
+	// needsRepo skips the check outside a repository, where it would only
+	// repeat that one failure in the words of whatever tool it asked.
+	needsRepo bool
 }
 
 func cmdDoctor(args []string) error {
@@ -38,7 +41,12 @@ func cmdDoctor(args []string) error {
 		return fmt.Errorf("doctor takes no arguments")
 	}
 	var failed int
+	_, repoErr := mainWorktree()
 	for _, c := range checks {
+		if c.needsRepo && repoErr != nil {
+			fmt.Printf("%s %-15s %s\n", dimStyle.Render("-"), c.name, dimStyle.Render("skipped — not in a git repository"))
+			continue
+		}
 		detail, err := c.run()
 		switch {
 		case err == nil:

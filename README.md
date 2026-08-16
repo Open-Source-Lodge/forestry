@@ -139,6 +139,9 @@ non-zero. `!` is a warning: that one feature is degraded, everything else works,
 and the exit status stays zero. The github check runs the real `gh pr list`
 call the pull request column uses, so it catches an expired login too.
 
+Outside a git repository the checks that need one are skipped with `-`, so the
+output names the one cause rather than repeating it per check.
+
 ## Contributing
 
 **Every new feature gets a doctor check.** If a feature depends on anything
