@@ -167,10 +167,17 @@ func cmdRemove(args []string) error {
 	if err != nil {
 		return err
 	}
+	here := insideDir(wt.Path)
 	if err := removeWorktree(wt, force); err != nil {
 		return err
 	}
 	fmt.Printf("removed %s\n", wt.Path)
+	if here {
+		// We cannot move the shell that ran us; tell it where to go.
+		if repo, err := os.Getwd(); err == nil {
+			fmt.Printf("your shell is in a deleted directory — cd %s\n", repo)
+		}
+	}
 	return nil
 }
 
@@ -178,10 +185,36 @@ func removeWorktree(wt Worktree, force bool) error {
 	if wt.Main {
 		return errors.New("refusing to remove the main worktree")
 	}
+	// Step out first: every git call after this one fails if our working
+	// directory is the tree that just got deleted.
+	if insideDir(wt.Path) {
+		repo, err := mainWorktree()
+		if err != nil {
+			return err
+		}
+		if err := os.Chdir(repo); err != nil {
+			return err
+		}
+	}
 	rm := []string{"worktree", "remove", wt.Path}
 	if force {
 		rm = append(rm, "--force")
 	}
 	_, err := git(rm...)
 	return err
+}
+
+// insideDir reports whether the working directory is dir or below it.
+func insideDir(dir string) bool {
+	cwd, err := os.Getwd()
+	if err != nil {
+		// The directory is already gone from under us; stepping out is still right.
+		return true
+	}
+	// Symlinked paths (/tmp on macOS) must compare against what git reports.
+	if real, err := filepath.EvalSymlinks(cwd); err == nil {
+		cwd = real
+	}
+	rel, err := filepath.Rel(dir, cwd)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }

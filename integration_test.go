@@ -140,6 +140,27 @@ func TestIntegrationNewAndRemove(t *testing.T) {
 	}
 }
 
+func TestIntegrationRemoveCurrentWorktree(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	dir := initRepo(t)
+	cdRepo(t, dir)
+
+	if err := run([]string{"new", "feat-here"}); err != nil {
+		t.Fatalf("forestry new feat-here: %v", err)
+	}
+	cdRepo(t, filepath.Join(worktreeRoot(dir), "feat-here"))
+
+	if err := run([]string{"remove", "feat-here"}); err != nil {
+		t.Fatalf("forestry remove feat-here: %v", err)
+	}
+	// git must still work afterwards: we should have stepped up to the repo.
+	if _, err := worktrees(); err != nil {
+		t.Fatalf("worktrees() after removing the current worktree: %v", err)
+	}
+}
+
 func TestIntegrationNewInvalidName(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
