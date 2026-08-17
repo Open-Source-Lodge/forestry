@@ -141,27 +141,39 @@ func existingAncestor(path string) string {
 	}
 }
 
+// settingsFiles are the `.forestry` files in play, nearest first.
+func settingsFiles() []string {
+	var paths []string
+	if repo, err := mainWorktree(); err == nil {
+		paths = append(paths, filepath.Join(repo, ".forestry"))
+	}
+	return append(paths, configPath())
+}
+
 func checkConfig() (string, error) {
-	path := configPath()
-	if path == "" {
-		return "", errors.New("no home directory — config file cannot be found")
-	}
-	if _, err := os.Stat(path); err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return "", fmt.Errorf("%s is unreadable: %v — forestry ignores it in silence", tilde(path), err)
+	var found []string
+	for _, path := range settingsFiles() {
+		if _, err := os.Stat(path); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return "", fmt.Errorf("%s is unreadable: %v — forestry ignores it in silence", tilde(path), err)
+			}
+			continue
 		}
-		return tilde(path) + " (none, using defaults)", nil
-	}
-	var set []string
-	for _, key := range []string{"root", "editor"} {
-		if v := configValue(key); v != "" {
-			set = append(set, key+"="+v)
+		var set []string
+		for _, key := range []string{"root", "editor", "delete_branch"} {
+			if v := fileValue(path, key); v != "" {
+				set = append(set, key+"="+v)
+			}
 		}
+		if len(set) == 0 {
+			return "", fmt.Errorf("%s sets nothing forestry knows — is it `key = value`?", tilde(path))
+		}
+		found = append(found, tilde(path)+": "+strings.Join(set, ", "))
 	}
-	if len(set) == 0 {
-		return "", fmt.Errorf("%s has no root or editor key — is it `key = value`?", tilde(path))
+	if len(found) == 0 {
+		return "no .forestry file (using defaults)", nil
 	}
-	return tilde(path) + ": " + strings.Join(set, ", "), nil
+	return strings.Join(found, "; "), nil
 }
 
 // checkGitHub runs the real pull request lookup the list column uses.

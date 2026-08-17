@@ -1,4 +1,4 @@
 # forestry settings for this repo — check this file in.
 
 # Delete the local branch when its worktree is removed.
-delete_branch = false
+delete_branch = true

@@ -195,7 +195,7 @@ forestry uses. The command tells you which item has a fault:
 ✓ repository      ~/github/myrepo
 ✓ worktrees       3 listed, all present
 ✓ worktree root   ~/github/myrepo-worktrees
-✓ config          ~/.config/forestry/config.toml: root=~/worktrees
+✓ config          ~/github/myrepo/.forestry: delete_branch=true; ~/.forestry: root=~/worktrees
 ! github          gh not on PATH — pull request column falls back to local merge detection
 ✓ merge fallback  origin/main
 ✓ pull refs       git@github.com:me/myrepo.git
@@ -282,9 +282,8 @@ The default location is adjacent to the repository, in `<repo>-worktrees/`:
 This location keeps the worktrees out of the repository. Thus `git status`
 does not show them, and editors and build tools do not read them.
 
-To put the worktrees of all the repositories in one directory, set a root
-directory. Use the file `~/.config/forestry/config.toml`, or the file
-`$XDG_CONFIG_HOME/forestry/config.toml`:
+To collect every repo's worktrees under one directory instead, set a root in
+`~/.forestry`:
 
 ```toml
 root = "~/worktrees"
@@ -298,25 +297,35 @@ use the same branch name:
 ~/worktrees/otherrepo/feat-login
 ```
 
-The `FORESTRY_ROOT` variable has precedence over the configuration file. Use
-this variable for one run:
+`FORESTRY_ROOT` overrides the settings file, which is handy for one-off runs:
 
 ```sh
 FORESTRY_ROOT=/tmp/scratch forestry new experiment
 ```
 
-## Repository settings
+## Settings
 
-Settings that belong to a repository rather than to you go in a `.forestry`
-file at the root of the repository, checked into git so everyone working on it
-gets the same behaviour. Put the same settings in `~/.forestry` to apply them to
-every repository; a repository's own `.forestry` wins where the two disagree.
-Same format as the user config:
+Settings live in `.forestry` files — `key = value` lines with `#` comments:
 
 ```toml
-# Delete the local branch when its worktree is removed.
-delete_branch = true
+root = "~/worktrees"                 # where worktrees go
+editor = "code -n"                   # what e opens
+delete_branch = true                 # delete the local branch with its worktree
 ```
+
+`~/.forestry` is yours and applies everywhere. A repository can also carry its
+own `.forestry` at its root, checked into git so everyone working on it gets the
+same behaviour, and it wins over `~/.forestry` where the two disagree.
+
+Only `delete_branch` is read from a repository's file. `root` and `editor` name
+a path and a command, and are read from `~/.forestry` alone — cloning a
+repository must never decide what runs on your machine or where forestry writes.
+
+| setting         | from                        | default                     |
+| --------------- | --------------------------- | --------------------------- |
+| `root`          | `~/.forestry`               | `<repo>-worktrees` next to the repo |
+| `editor`        | `~/.forestry`               | `$VISUAL`, then `$EDITOR`   |
+| `delete_branch` | repo `.forestry`, then `~/` | `false`                     |
 
 With `delete_branch = true`, `forestry remove` also runs `git branch -d` on the
 branch the worktree had checked out — `-D` when you pass `--force`. If the
