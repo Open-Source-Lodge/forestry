@@ -207,8 +207,20 @@ func removeWorktree(wt Worktree, force bool) error {
 	if force {
 		rm = append(rm, "--force")
 	}
-	_, err := git(rm...)
-	return err
+	if _, err := git(rm...); err != nil {
+		return err
+	}
+	if wt.Branch == "" || !deleteBranchOnRemove() {
+		return nil
+	}
+	del := "-d"
+	if force {
+		del = "-D"
+	}
+	if _, err := git("branch", del, wt.Branch); err != nil {
+		return fmt.Errorf("removed the worktree, but kept branch %s: %w", wt.Branch, err)
+	}
+	return nil
 }
 
 // insideDir reports whether the working directory is dir or below it.

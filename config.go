@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -56,13 +57,37 @@ func editorCommand() []string {
 	return nil
 }
 
-// configValue reads key from the config file. The format is a minimal subset of
-// TOML: `key = value` lines with `#` comments.
+// forestryValue reads key from the repo's `.forestry` file, which is meant to be
+// checked in so a repo's settings travel with it, and falls back to `~/.forestry`
+// for the settings you want in every repo.
+func forestryValue(key string) string {
+	if repo, err := mainWorktree(); err == nil {
+		if v := fileValue(filepath.Join(repo, ".forestry"), key); v != "" {
+			return v
+		}
+	}
+	return fileValue(expandHome("~/.forestry"), key)
+}
+
+// deleteBranchOnRemove reports whether removing a worktree should also delete
+// the local branch it had checked out.
+func deleteBranchOnRemove() bool {
+	on, _ := strconv.ParseBool(forestryValue("delete_branch"))
+	return on
+}
+
+// configValue reads key from the user's config file.
 func configValue(key string) string {
 	path := configPath()
 	if path == "" {
 		return ""
 	}
+	return fileValue(path, key)
+}
+
+// fileValue reads key from a config file. The format is a minimal subset of
+// TOML: `key = value` lines with `#` comments.
+func fileValue(path, key string) string {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""

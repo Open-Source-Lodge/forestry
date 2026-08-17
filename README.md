@@ -304,3 +304,21 @@ this variable for one run:
 ```sh
 FORESTRY_ROOT=/tmp/scratch forestry new experiment
 ```
+
+## Repository settings
+
+Settings that belong to a repository rather than to you go in a `.forestry`
+file at the root of the repository, checked into git so everyone working on it
+gets the same behaviour. Put the same settings in `~/.forestry` to apply them to
+every repository; a repository's own `.forestry` wins where the two disagree.
+Same format as the user config:
+
+```toml
+# Delete the local branch when its worktree is removed.
+delete_branch = true
+```
+
+With `delete_branch = true`, `forestry remove` also runs `git branch -d` on the
+branch the worktree had checked out — `-D` when you pass `--force`. If the
+branch has unmerged commits the worktree is still removed and the branch kept,
+and forestry says so.

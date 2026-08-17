@@ -95,6 +95,47 @@ empty =
 	}
 }
 
+func TestDeleteBranchOnRemove(t *testing.T) {
+	repo := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		return "worktree " + repo, nil
+	})
+	write := func(content string) {
+		if err := os.WriteFile(filepath.Join(repo, ".forestry"), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if deleteBranchOnRemove() {
+		t.Error("no .forestry file should mean no branch deletion")
+	}
+	write("delete_branch = false\n")
+	if deleteBranchOnRemove() {
+		t.Error("delete_branch = false should mean no branch deletion")
+	}
+	write("# keep branches?\ndelete_branch = true\n")
+	if !deleteBranchOnRemove() {
+		t.Error("delete_branch = true should mean branch deletion")
+	}
+
+	// ~/.forestry applies when the repo has nothing to say, and only then.
+	if err := os.WriteFile(filepath.Join(home, ".forestry"), []byte("delete_branch = true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	write("delete_branch = false\n")
+	if deleteBranchOnRemove() {
+		t.Error("the repo .forestry should win over ~/.forestry")
+	}
+	if err := os.Remove(filepath.Join(repo, ".forestry")); err != nil {
+		t.Fatal(err)
+	}
+	if !deleteBranchOnRemove() {
+		t.Error("~/.forestry should apply with no repo .forestry")
+	}
+}
+
 func TestEditorCommand(t *testing.T) {
 	t.Cleanup(func() {
 		os.Unsetenv("FORESTRY_EDITOR")
