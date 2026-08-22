@@ -217,8 +217,8 @@ func removeWorktree(wt Worktree, force bool) error {
 	if force {
 		del = "-D"
 	}
-	if _, err := git("branch", del, wt.Branch); err != nil {
-		return fmt.Errorf("removed the worktree, but kept branch %s: %w", wt.Branch, err)
+	if _, err := git("branch", del, "--", wt.Branch); err != nil {
+		return fmt.Errorf("removed the worktree, but kept branch %q: %w", wt.Branch, err)
 	}
 	return nil
 }

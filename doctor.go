@@ -144,8 +144,8 @@ func existingAncestor(path string) string {
 // settingsFiles are the `.forestry` files in play, nearest first.
 func settingsFiles() []string {
 	var paths []string
-	if repo, err := mainWorktree(); err == nil {
-		paths = append(paths, filepath.Join(repo, ".forestry"))
+	if path, err := repoConfigPath(); err == nil {
+		paths = append(paths, path)
 	}
 	return append(paths, configPath())
 }

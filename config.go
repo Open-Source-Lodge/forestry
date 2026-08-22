@@ -55,12 +55,22 @@ func editorCommand() []string {
 // a setting that names a path or a command goes through configValue instead, so
 // that cloning a repo cannot pick what runs on your machine.
 func repoValue(key string) string {
-	if repo, err := mainWorktree(); err == nil {
-		if v := fileValue(filepath.Join(repo, ".forestry"), key); v != "" {
+	if path, err := repoConfigPath(); err == nil {
+		if v := fileValue(path, key); v != "" {
 			return v
 		}
 	}
 	return configValue(key)
+}
+
+// repoConfigPath is the `.forestry` of the worktree the command runs in — the
+// checkout you are working in decides, not whatever the main worktree has out.
+func repoConfigPath() (string, error) {
+	root, err := git("rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, ".forestry"), nil
 }
 
 // deleteBranchOnRemove reports whether removing a worktree should also delete

@@ -86,7 +86,7 @@ func TestDeleteBranchOnRemove(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	stubCommand(t, func(name string, args ...string) (string, error) {
-		return "worktree " + repo, nil
+		return repo, nil // git rev-parse --show-toplevel
 	})
 	write := func(content string) {
 		if err := os.WriteFile(filepath.Join(repo, ".forestry"), []byte(content), 0o600); err != nil {
