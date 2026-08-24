@@ -72,13 +72,15 @@ func TestChecksSayWhy(t *testing.T) {
 }
 
 func TestCheckConfig(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	if detail, err := checkConfig(); err != nil || !strings.Contains(detail, "none") {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		return t.TempDir(), nil // a repo with no .forestry
+	})
+	if detail, err := checkConfig(); err != nil || !strings.Contains(detail, "no .forestry") {
 		t.Errorf("no file: %q, %v", detail, err)
 	}
-	path := filepath.Join(dir, "forestry", "config.toml")
-	os.MkdirAll(filepath.Dir(path), 0o755)
+	path := filepath.Join(home, ".forestry")
 	os.WriteFile(path, []byte("# nothing\n"), 0o644)
 	if _, err := checkConfig(); err == nil {
 		t.Error("a file with no known key must be an error")
@@ -90,7 +92,7 @@ func TestCheckConfig(t *testing.T) {
 }
 
 func TestCheckEditor(t *testing.T) {
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	for _, v := range []string{"FORESTRY_EDITOR", "VISUAL", "EDITOR"} {
 		t.Setenv(v, "")
 	}
