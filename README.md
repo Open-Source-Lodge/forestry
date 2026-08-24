@@ -124,6 +124,10 @@ forestry new hotfix --from origin/main
 forestry new existing-branch         # no --from, and the branch exists: check it out
 ```
 
+If the branch exists on `origin` but not in your clone, forestry gets it from
+`origin` and makes the worktree from that state. If the branch exists,
+forestry ignores `--from` and checks the branch out as it is.
+
 A branch name can contain slashes. In the name of the directory, forestry
 replaces each slash with a hyphen. Thus the branch `feat/login` uses the
 directory `feat-login`.

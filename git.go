@@ -126,7 +126,16 @@ func findWorktree(name string) (Worktree, error) {
 }
 
 func branchExists(name string) bool {
-	_, err := git("show-ref", "--verify", "--quiet", "refs/heads/"+name)
+	return refExists("refs/heads/" + name)
+}
+
+// ponytail: the remote is "origin", as it is in pr.go.
+func remoteBranchExists(name string) bool {
+	return refExists("refs/remotes/origin/" + name)
+}
+
+func refExists(ref string) bool {
+	_, err := git("show-ref", "--verify", "--quiet", ref)
 	return err == nil
 }
 
