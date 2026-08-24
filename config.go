@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -10,7 +11,7 @@ import (
 // at repoPath. It is, in order of precedence:
 //
 //	$FORESTRY_ROOT/<repo>
-//	<root from config file>/<repo>
+//	<root from ~/.forestry>/<repo>
 //	<repo parent>/<repo>-worktrees
 func worktreeRoot(repoPath string) string {
 	repo := filepath.Base(repoPath)
@@ -23,23 +24,15 @@ func worktreeRoot(repoPath string) string {
 	return filepath.Join(filepath.Dir(repoPath), repo+"-worktrees")
 }
 
-func configPath() string {
-	dir := os.Getenv("XDG_CONFIG_HOME")
-	if dir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		dir = filepath.Join(home, ".config")
-	}
-	return filepath.Join(dir, "forestry", "config.toml")
-}
+// configPath is your own settings file: same name and format as a repo's
+// checked-in `.forestry`, for the settings you want in every repo.
+func configPath() string { return expandHome("~/.forestry") }
 
 // editorCommand is the editor to open a worktree with, as command and
 // arguments. It is, in order of precedence:
 //
 //	$FORESTRY_EDITOR
-//	<editor from config file>
+//	<editor from ~/.forestry>
 //	$VISUAL
 //	$EDITOR
 func editorCommand() []string {
@@ -56,13 +49,43 @@ func editorCommand() []string {
 	return nil
 }
 
-// configValue reads key from the config file. The format is a minimal subset of
-// TOML: `key = value` lines with `#` comments.
-func configValue(key string) string {
-	path := configPath()
-	if path == "" {
-		return ""
+// repoValue reads key from the repo's `.forestry` file, which is meant to be
+// checked in so a repo's settings travel with it, and falls back to your own
+// `~/.forestry`. Only for settings a repo may decide for everyone working in it:
+// a setting that names a path or a command goes through configValue instead, so
+// that cloning a repo cannot pick what runs on your machine.
+func repoValue(key string) string {
+	if path, err := repoConfigPath(); err == nil {
+		if v := fileValue(path, key); v != "" {
+			return v
+		}
 	}
+	return configValue(key)
+}
+
+// repoConfigPath is the `.forestry` of the worktree the command runs in — the
+// checkout you are working in decides, not whatever the main worktree has out.
+func repoConfigPath() (string, error) {
+	root, err := git("rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, ".forestry"), nil
+}
+
+// deleteBranchOnRemove reports whether removing a worktree should also delete
+// the local branch it had checked out.
+func deleteBranchOnRemove() bool {
+	on, _ := strconv.ParseBool(repoValue("delete_branch"))
+	return on
+}
+
+// configValue reads key from your own `~/.forestry`.
+func configValue(key string) string { return fileValue(configPath(), key) }
+
+// fileValue reads key from a config file. The format is a minimal subset of
+// TOML: `key = value` lines with `#` comments.
+func fileValue(path, key string) string {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""

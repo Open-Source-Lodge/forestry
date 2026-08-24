@@ -31,6 +31,7 @@ func TestExpandHome(t *testing.T) {
 
 func TestWorktreeRoot(t *testing.T) {
 	t.Cleanup(func() { os.Unsetenv("FORESTRY_ROOT") })
+	t.Setenv("HOME", t.TempDir()) // no ~/.forestry to interfere
 
 	// Default: sibling directory named <repo>-worktrees.
 	os.Unsetenv("FORESTRY_ROOT")
@@ -50,33 +51,18 @@ func TestWorktreeRoot(t *testing.T) {
 }
 
 func TestConfigValue(t *testing.T) {
-	dir := t.TempDir()
-	cfgFile := filepath.Join(dir, "config.toml")
+	home := t.TempDir()
+	t.Setenv("HOME", home)
 
-	content := `# forestry config
+	content := `# forestry settings
 root = /mnt/worktrees
 editor = "vim -p"
 # another comment
 empty =
 `
-	if err := os.WriteFile(cfgFile, []byte(content), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(home, ".forestry"), []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
-
-	// Point configPath() to our temp file by overriding XDG_CONFIG_HOME.
-	// configPath() uses XDG_CONFIG_HOME and appends "forestry/config.toml".
-	os.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, ".."))
-	// Our file is at dir/config.toml, but configPath() will look for
-	// <XDG_CONFIG_HOME>/forestry/config.toml.  Recreate the expected layout.
-	cfgDir := filepath.Join(dir, "forestry")
-	if err := os.MkdirAll(cfgDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(cfgDir, "config.toml"), []byte(content), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	os.Setenv("XDG_CONFIG_HOME", dir)
-	t.Cleanup(func() { os.Unsetenv("XDG_CONFIG_HOME") })
 
 	tests := []struct {
 		key  string
@@ -95,18 +81,58 @@ empty =
 	}
 }
 
+func TestDeleteBranchOnRemove(t *testing.T) {
+	repo := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		return repo, nil // git rev-parse --show-toplevel
+	})
+	write := func(content string) {
+		if err := os.WriteFile(filepath.Join(repo, ".forestry"), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if deleteBranchOnRemove() {
+		t.Error("no .forestry file should mean no branch deletion")
+	}
+	write("delete_branch = false\n")
+	if deleteBranchOnRemove() {
+		t.Error("delete_branch = false should mean no branch deletion")
+	}
+	write("# keep branches?\ndelete_branch = true\n")
+	if !deleteBranchOnRemove() {
+		t.Error("delete_branch = true should mean branch deletion")
+	}
+
+	// ~/.forestry applies when the repo has nothing to say, and only then.
+	if err := os.WriteFile(filepath.Join(home, ".forestry"), []byte("delete_branch = true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	write("delete_branch = false\n")
+	if deleteBranchOnRemove() {
+		t.Error("the repo .forestry should win over ~/.forestry")
+	}
+	if err := os.Remove(filepath.Join(repo, ".forestry")); err != nil {
+		t.Fatal(err)
+	}
+	if !deleteBranchOnRemove() {
+		t.Error("~/.forestry should apply with no repo .forestry")
+	}
+}
+
 func TestEditorCommand(t *testing.T) {
 	t.Cleanup(func() {
 		os.Unsetenv("FORESTRY_EDITOR")
 		os.Unsetenv("VISUAL")
 		os.Unsetenv("EDITOR")
-		os.Unsetenv("XDG_CONFIG_HOME")
 	})
 	os.Unsetenv("FORESTRY_EDITOR")
 	os.Unsetenv("VISUAL")
 	os.Unsetenv("EDITOR")
-	// Point config to empty dir so no config file exists.
-	os.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// Point home at an empty dir so no ~/.forestry exists.
+	t.Setenv("HOME", t.TempDir())
 
 	if got := editorCommand(); got != nil {
 		t.Errorf("expected nil when no editor set, got %v", got)

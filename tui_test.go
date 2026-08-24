@@ -612,7 +612,7 @@ func TestEditorCmdWithoutEditor(t *testing.T) {
 	for _, v := range []string{"FORESTRY_EDITOR", "VISUAL", "EDITOR"} {
 		t.Setenv(v, "")
 	}
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	if msg := editorCmd("/x")().(doneMsg); msg.err == nil {
 		t.Error("no editor must be an error")
 	}
