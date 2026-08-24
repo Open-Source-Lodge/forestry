@@ -51,8 +51,13 @@ on the worktree that you select:
 | `P`             | select an open pull request, or type its number      |
 | `p`             | open the pull request of the worktree in a browser   |
 | `d`             | remove the selected worktree, after a confirmation   |
+
 | `r`             | read the list again                                  |
 | `q` `esc`       | stop forestry                                        |
+
+In the confirmation, press `y` to remove the worktree. Press `Y` to remove
+the worktree and also delete its local branch. Press `f` to remove a worktree
+that has changes that you did not commit.
 
 The `•` mark shows the worktree that you are in. The selection starts at that
 worktree.

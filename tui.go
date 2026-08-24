@@ -31,7 +31,7 @@ const (
 	listHelp   = "↑↓ move · enter shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit"
 	newHelp    = "tab next field · enter create · esc cancel"
 	prHelp     = "↑↓ pick · ←→ page · type a number · enter create · esc cancel"
-	removeHelp = "y remove · f force remove · esc cancel"
+	removeHelp = "y remove · Y remove + delete branch · f force remove · esc cancel"
 	busyHelp   = "working · ctrl+c quit"
 )
 
@@ -83,11 +83,11 @@ type model struct {
 	cursor  int
 	// openPath asks tui() to open a shell there after Bubble Tea exits.
 	openPath string
-	mode    mode
-	inputs  []textinput.Model
-	focus   int
-	msg     string
-	msgErr  bool
+	mode     mode
+	inputs   []textinput.Model
+	focus    int
+	msg      string
+	msgErr   bool
 	// busy describes an action still running; busyPath marks its row.
 	busy     string
 	busyPath string
@@ -169,12 +169,20 @@ func createFromPRCmd(number string) tea.Cmd {
 	}
 }
 
-func removeCmd(wt Worktree, force bool) tea.Cmd {
+// removeCmd removes wt. With branch set, it then deletes the local branch too.
+func removeCmd(wt Worktree, force, branch bool) tea.Cmd {
 	return func() tea.Msg {
 		if err := removeWorktree(wt, force); err != nil {
 			return doneMsg{err: err}
 		}
-		return doneMsg{text: "removed " + wt.Name()}
+		if !branch || wt.Branch == "" {
+			return doneMsg{text: "removed " + wt.Name()}
+		}
+		// ponytail: -D, because the user asked for the branch to go.
+		if _, err := git("branch", "-D", wt.Branch); err != nil {
+			return doneMsg{err: fmt.Errorf("removed %s, but: %w", wt.Name(), err)}
+		}
+		return doneMsg{text: "removed " + wt.Name() + " and branch " + wt.Branch}
 	}
 }
 
@@ -434,10 +442,13 @@ func (m model) updateRemove(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "enter":
 		m.mode = modeList
-		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false))
+		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false, false))
+	case "Y":
+		m.mode = modeList
+		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false, true))
 	case "f":
 		m.mode = modeList
-		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, true))
+		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, true, false))
 	case "esc", "n", "q", "ctrl+c":
 		m.mode = modeList
 	}
