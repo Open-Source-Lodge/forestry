@@ -70,3 +70,54 @@ func TestChecksSayWhy(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckConfig(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	if detail, err := checkConfig(); err != nil || !strings.Contains(detail, "none") {
+		t.Errorf("no file: %q, %v", detail, err)
+	}
+	path := filepath.Join(dir, "forestry", "config.toml")
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	os.WriteFile(path, []byte("# nothing\n"), 0o644)
+	if _, err := checkConfig(); err == nil {
+		t.Error("a file with no known key must be an error")
+	}
+	os.WriteFile(path, []byte("editor = \"vi\"\n"), 0o644)
+	if detail, err := checkConfig(); err != nil || !strings.Contains(detail, "editor=vi") {
+		t.Errorf("file with editor: %q, %v", detail, err)
+	}
+}
+
+func TestCheckEditor(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	for _, v := range []string{"FORESTRY_EDITOR", "VISUAL", "EDITOR"} {
+		t.Setenv(v, "")
+	}
+	if _, err := checkEditor(); err == nil {
+		t.Error("no editor must be an error")
+	}
+	t.Setenv("EDITOR", "no-such-editor-xyz")
+	if _, err := checkEditor(); err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Errorf("missing editor: %v", err)
+	}
+	t.Setenv("EDITOR", "true -x")
+	if detail, err := checkEditor(); err != nil || detail != "true -x" {
+		t.Errorf("real editor: %q, %v", detail, err)
+	}
+}
+
+func TestCheckWorktreesReportsMissingDirectory(t *testing.T) {
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		return "worktree /nope/gone\nHEAD abc\nbranch refs/heads/x\n", nil
+	})
+	if _, err := checkWorktrees(); err == nil || !strings.Contains(err.Error(), "prune") {
+		t.Errorf("got %v, want a prune hint", err)
+	}
+}
+
+func TestCmdDoctorRejectsArguments(t *testing.T) {
+	if err := cmdDoctor([]string{"x"}); err == nil {
+		t.Error("doctor with arguments must fail")
+	}
+}
