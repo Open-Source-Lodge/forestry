@@ -265,6 +265,23 @@ warning when only one function is not fully available. Set `needs` to the
 prerequisite check. Then forestry reports a shared cause one time. Thus
 `forestry doctor` continues to tell you if all the functions operate.
 
+### Release
+
+The `release` workflow makes a release each time a pull request merges to
+`main`. It reads the commit messages since the last tag. Write the commit
+messages in the Conventional Commits format. The workflow selects the version
+number with these rules:
+
+| commit message                                | version change |
+| --------------------------------------------- | -------------- |
+| `feat!:` or a `BREAKING CHANGE:` footer       | major          |
+| `feat:`                                       | minor          |
+| `fix:` or `perf:`                             | patch          |
+| other types, such as `docs:` or `ci:`         | no release     |
+
+The workflow creates a tag such as `v1.2.3` and a GitHub release with notes
+that GitHub generates from the pull requests.
+
 ### Documentation rules
 
 Write all documentation in this repository in ASD-STE100 Simplified Technical
