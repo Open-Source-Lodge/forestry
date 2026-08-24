@@ -1,8 +1,8 @@
 BIN := bin/forestry
 
-.PHONY: all build run test cover vet fmt install clean
+.PHONY: all build run test cover vet lint fmt install clean
 
-all: vet test build
+all: lint test build
 
 build:
 	go build -o $(BIN) .
@@ -18,6 +18,10 @@ cover:
 
 vet:
 	go vet ./...
+
+lint: vet
+	test -z "$$(gofmt -l .)"
+	go run honnef.co/go/tools/cmd/staticcheck@latest ./...
 
 fmt:
 	go fmt ./...

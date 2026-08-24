@@ -122,3 +122,42 @@ func TestRank(t *testing.T) {
 		t.Error("closed and unknown state should have equal rank")
 	}
 }
+
+// With no gh, the list falls back to the local ancestry check.
+func TestPullRequestsFallsBackToMergedBranches(t *testing.T) {
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		call := name + " " + strings.Join(args, " ")
+		switch {
+		case name == "gh":
+			return "", errors.New("gh: not found")
+		case strings.HasPrefix(call, "git symbolic-ref"):
+			return "origin/main", nil
+		case strings.Contains(call, "--is-ancestor done origin/main"):
+			return "", nil
+		}
+		return "", errors.New("not an ancestor")
+	})
+	prs := pullRequests([]string{"done", "open", "main", ""})
+	if prs["done"].State != "merged" || len(prs) != 1 {
+		t.Errorf("got %v, want only done as merged", prs)
+	}
+}
+
+func TestDefaultBranchFallsBackToLocalRefs(t *testing.T) {
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		if strings.Join(args, " ") == "rev-parse --verify --quiet master" {
+			return "", nil
+		}
+		return "", errors.New("no")
+	})
+	if got := defaultBranch(); got != "master" {
+		t.Errorf("defaultBranch() = %q, want master", got)
+	}
+	stubCommand(t, func(string, ...string) (string, error) { return "", errors.New("no") })
+	if got := defaultBranch(); got != "" {
+		t.Errorf("defaultBranch() with no refs = %q, want empty", got)
+	}
+	if mergedBranches([]string{"x"}) != nil {
+		t.Error("mergedBranches with no default branch must be nil")
+	}
+}
