@@ -267,10 +267,10 @@ prerequisite check. Then forestry reports a shared cause one time. Thus
 
 ### Release
 
-The `release` workflow makes a release each time a pull request merges to
-`main`. It reads the commit messages since the last tag. Write the commit
-messages in the Conventional Commits format. The workflow selects the version
-number with these rules:
+The `release` workflow runs [release-please](https://github.com/googleapis/release-please)
+each time a pull request merges to `main`. Release-please reads the commit
+messages since the last release. Write the commit messages in the Conventional
+Commits format. Release-please selects the version number with these rules:
 
 | commit message                                | version change |
 | --------------------------------------------- | -------------- |
@@ -279,8 +279,9 @@ number with these rules:
 | `fix:` or `perf:`                             | patch          |
 | other types, such as `docs:` or `ci:`         | no release     |
 
-The workflow creates a tag such as `v1.2.3` and a GitHub release with notes
-that GitHub generates from the pull requests.
+Release-please opens a release pull request. The pull request updates
+`CHANGELOG.md` with the new version. Merge the release pull request to make
+the tag, such as `v1.2.3`, and the GitHub release.
 
 ### Documentation rules
 
