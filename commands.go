@@ -113,9 +113,16 @@ func createWorktree(name, from string) (string, error) {
 	return path, nil
 }
 
-// addWorktree reuses branch name if it already exists and no base was asked for.
+// addWorktree checks branch name out if it already exists, on this machine or
+// on the remote. Only a name that is new anywhere makes a branch.
 func addWorktree(path, name, from string) error {
-	if from == "" && branchExists(name) {
+	if !branchExists(name) && !remoteBranchExists(name) {
+		// The branch can be on the remote but not yet in this clone.
+		git("fetch", "origin", "refs/heads/"+name+":refs/remotes/origin/"+name)
+	}
+	if branchExists(name) || remoteBranchExists(name) {
+		// ponytail: an existing branch is checked out as it is; --from is ignored.
+		// git makes a local branch on the remote one when only that one is there.
 		_, err := git("worktree", "add", path, name)
 		return err
 	}

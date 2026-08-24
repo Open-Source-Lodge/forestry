@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -260,5 +261,22 @@ func TestNewInputTabCycles(t *testing.T) {
 	m = next.(model)
 	if m.focus != 0 {
 		t.Errorf("after second tab focus = %d, want 0", m.focus)
+	}
+}
+
+// Y removes the worktree and then deletes its local branch.
+func TestRemoveCmdDeletesBranch(t *testing.T) {
+	var ran []string
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		ran = append(ran, strings.Join(args, " "))
+		return "", nil
+	})
+	msg := removeCmd(Worktree{Path: "/x/wt", Branch: "feat"}, false, true)().(doneMsg)
+	if msg.err != nil {
+		t.Fatal(msg.err)
+	}
+	joined := strings.Join(ran, "\n")
+	if !strings.Contains(joined, "worktree remove /x/wt") || !strings.Contains(joined, "branch -D feat") {
+		t.Errorf("wrong git calls:\n%s", joined)
 	}
 }

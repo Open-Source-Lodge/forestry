@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -85,5 +87,85 @@ func TestDispatchHelp(t *testing.T) {
 		if err := dispatch(cmd, nil); err != nil {
 			t.Errorf("dispatch(%q) unexpected error: %v", cmd, err)
 		}
+	}
+}
+
+// A branch that is only on the remote is fetched and then checked out as it is.
+func TestCreateWorktreeUsesRemoteBranch(t *testing.T) {
+	repo := filepath.Join(t.TempDir(), "repo")
+	var ran []string
+	var fetched bool
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		line := strings.Join(append([]string{name}, args...), " ")
+		ran = append(ran, line)
+		switch {
+		case strings.Contains(line, "show-ref"):
+			if !strings.Contains(line, "refs/remotes/origin/feat") || !fetched {
+				return "", errors.New("no such ref")
+			}
+		case strings.Contains(line, "fetch"):
+			fetched = true
+		case strings.Contains(line, "worktree list"):
+			return "worktree " + repo + "\nbranch refs/heads/main\n", nil
+		}
+		return "", nil
+	})
+
+	if _, err := createWorktree("feat", ""); err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(ran, "\n")
+	if !strings.Contains(joined, "git fetch origin refs/heads/feat:refs/remotes/origin/feat") {
+		t.Errorf("remote branch not fetched:\n%s", joined)
+	}
+	if !strings.Contains(joined, "worktree add "+repo+"-worktrees/feat feat") || strings.Contains(joined, "add -b") {
+		t.Errorf("branch not checked out as it is:\n%s", joined)
+	}
+}
+
+// A name that is nowhere yet makes a branch, and no fetch keeps it waiting.
+func TestCreateWorktreeMakesNewBranch(t *testing.T) {
+	repo := filepath.Join(t.TempDir(), "repo")
+	var ran []string
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		line := strings.Join(append([]string{name}, args...), " ")
+		ran = append(ran, line)
+		switch {
+		case strings.Contains(line, "show-ref"):
+			return "", errors.New("no such ref")
+		case strings.Contains(line, "fetch"):
+			return "", errors.New("couldn't find remote ref")
+		case strings.Contains(line, "worktree list"):
+			return "worktree " + repo + "\nbranch refs/heads/main\n", nil
+		}
+		return "", nil
+	})
+
+	if _, err := createWorktree("feat", ""); err != nil {
+		t.Fatal(err)
+	}
+	if joined := strings.Join(ran, "\n"); !strings.Contains(joined, "worktree add -b feat "+repo+"-worktrees/feat HEAD") {
+		t.Errorf("new branch not made:\n%s", joined)
+	}
+}
+
+// An existing branch is checked out as it is, also when --from is given.
+func TestCreateWorktreeIgnoresFromForExistingBranch(t *testing.T) {
+	repo := filepath.Join(t.TempDir(), "repo")
+	var ran []string
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		line := strings.Join(append([]string{name}, args...), " ")
+		ran = append(ran, line)
+		if strings.Contains(line, "worktree list") {
+			return "worktree " + repo + "\nbranch refs/heads/main\n", nil
+		}
+		return "", nil
+	})
+
+	if _, err := createWorktree("feat", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if joined := strings.Join(ran, "\n"); !strings.Contains(joined, "worktree add "+repo+"-worktrees/feat feat") || strings.Contains(joined, "add -b") {
+		t.Errorf("existing branch not checked out as it is:\n%s", joined)
 	}
 }

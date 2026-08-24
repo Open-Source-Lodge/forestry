@@ -51,8 +51,13 @@ on the worktree that you select:
 | `P`             | select an open pull request, or type its number      |
 | `p`             | open the pull request of the worktree in a browser   |
 | `d`             | remove the selected worktree, after a confirmation   |
+
 | `r`             | read the list again                                  |
 | `q` `esc`       | stop forestry                                        |
+
+In the confirmation, press `y` to remove the worktree. Press `Y` to remove
+the worktree and also delete its local branch. Press `f` to remove a worktree
+that has changes that you did not commit.
 
 The `•` mark shows the worktree that you are in. The selection starts at that
 worktree.
@@ -118,6 +123,10 @@ forestry new hotfix --from v1.2.0    # make the branch from a tag
 forestry new hotfix --from origin/main
 forestry new existing-branch         # no --from, and the branch exists: check it out
 ```
+
+If the branch exists on `origin` but not in your clone, forestry gets it from
+`origin` and makes the worktree from that state. If the branch exists,
+forestry ignores `--from` and checks the branch out as it is.
 
 A branch name can contain slashes. In the name of the directory, forestry
 replaces each slash with a hyphen. Thus the branch `feat/login` uses the
