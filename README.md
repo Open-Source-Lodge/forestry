@@ -21,6 +21,7 @@ forestry new <name> [--from <ref>]  make a worktree on branch <name>
 forestry pr <number>                make a worktree from a pull request
 forestry remove <name> [--force]    remove a worktree
 forestry doctor                     make sure that forestry can operate
+forestry version                    show the forestry version
 forestry help                       show the help
 ```
 
@@ -282,6 +283,11 @@ Commits format. Release-please selects the version number with these rules:
 Release-please opens a release pull request. The pull request updates
 `CHANGELOG.md` with the new version. Merge the release pull request to make
 the tag, such as `v1.2.3`, and the GitHub release.
+
+When the release is made, the `binaries` job builds `forestry` for macOS and
+Linux, on the amd64 and arm64 architectures. The job attaches the binaries to
+the GitHub release. The job also sets the version in the binaries, so that
+`forestry version` shows the tag.
 
 ### Documentation rules
 
