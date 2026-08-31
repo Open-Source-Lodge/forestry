@@ -24,22 +24,47 @@ type shell struct {
 
 func shellsPath() string { return expandHome("~/.forestry-shells") }
 
+// lockShells takes an exclusive lock on the registry file. The lock makes
+// sure that a rewrite does not erase a record that a different process
+// appends at the same time. The returned function releases the lock.
+func lockShells() (func(), error) {
+	f, err := os.OpenFile(shellsPath(), os.O_CREATE|os.O_RDONLY, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		f.Close()
+		return nil, err
+	}
+	return func() { f.Close() }, nil
+}
+
 // registerShell records the shell with pid that runs in the worktree at path.
 func registerShell(pid int, path string) {
 	// The shell shares the terminal with the forestry process that starts it.
 	tty, _ := command("ps", "-o", "tty=", "-p", strconv.Itoa(os.Getpid()))
+	unlock, err := lockShells()
+	if err != nil {
+		return
+	}
+	defer unlock()
 	f, err := os.OpenFile(shellsPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return
 	}
-	// ponytail: one O_APPEND write per shell; concurrent registrations stay
-	// whole, and openShells prunes whatever a crash leaves behind.
+	// ponytail: flock serializes each append and each rewrite; openShells
+	// prunes what a crash leaves behind.
 	fmt.Fprintf(f, "%d\t%s\t%s\t%s\n", pid, tty, os.Getenv("TMUX_PANE"), path)
 	f.Close()
 }
 
 // unregisterShell removes the record of the shell with pid.
 func unregisterShell(pid int) {
+	unlock, err := lockShells()
+	if err != nil {
+		return
+	}
+	defer unlock()
 	var keep []shell
 	for _, s := range readShells() {
 		if s.pid != pid {
@@ -52,6 +77,11 @@ func unregisterShell(pid int) {
 // openShells is the set of live shells, keyed by worktree path. It removes the
 // records of shells that no longer run.
 func openShells() map[string][]shell {
+	// Without the lock, forestry still reads the file, but does not prune it.
+	unlock, lockErr := lockShells()
+	if lockErr == nil {
+		defer unlock()
+	}
 	all := readShells()
 	var live []shell
 	for _, s := range all {
@@ -59,7 +89,7 @@ func openShells() map[string][]shell {
 			live = append(live, s)
 		}
 	}
-	if len(live) != len(all) {
+	if lockErr == nil && len(live) != len(all) {
 		writeShells(live)
 	}
 	byPath := make(map[string][]shell)
@@ -102,9 +132,10 @@ func writeShells(list []shell) {
 	os.WriteFile(shellsPath(), []byte(b.String()), 0o600)
 }
 
-// focusShell moves the focus to the terminal that holds the shell. A shell in
-// tmux gets its client switched; on macOS, a Terminal.app or iTerm2 tab is
-// selected by its tty. Anywhere else forestry can only say where the shell is.
+// focusShell moves the focus to the terminal that holds the shell. For a
+// shell in tmux, forestry switches the tmux client; on macOS, forestry
+// selects the Terminal.app or iTerm2 tab by its tty. On other systems,
+// forestry can only say where the shell is.
 func focusShell(s shell) error {
 	if s.pane != "" {
 		if _, err := command("tmux", "switch-client", "-t", s.pane); err == nil {
@@ -206,11 +237,12 @@ func focusTerminalApp(tty string) error {
 		{"iTerm2", itermScript},
 	}
 	for _, a := range scripts {
-		// pgrep keeps osascript from starting a terminal that does not run.
+		// pgrep makes sure that osascript does not start a terminal that
+		// does not run.
 		if _, err := command("pgrep", "-x", a.proc); err != nil {
 			continue
 		}
-		out, err := command("osascript", "-e", fmt.Sprintf(a.script, tty))
+		out, err := command("osascript", "-e", fmt.Sprintf(a.script, asq(tty)))
 		if err == nil && out == "true" {
 			return nil
 		}
