@@ -25,6 +25,7 @@ var checks = []check{
 	{name: "merge fallback", run: checkFallback, warn: true, needs: "repository"},
 	{name: "pull refs", run: checkPullRefs, warn: true, needs: "repository"},
 	{name: "shell", run: checkShell, warn: true},
+	{name: "open shells", run: checkOpenShells, warn: true},
 	{name: "editor", run: checkEditor, warn: true},
 }
 
@@ -223,6 +224,21 @@ func checkShell() (string, error) {
 		return "", fmt.Errorf("$SHELL is %s, which does not exist", sh)
 	}
 	return sh, nil
+}
+
+// checkOpenShells verifies the shell registry is writable, and counts the
+// shells that are open now.
+func checkOpenShells() (string, error) {
+	f, err := os.OpenFile(shellsPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return "", fmt.Errorf("%s is not writable: %v — forestry cannot record open shells", tilde(shellsPath()), err)
+	}
+	f.Close()
+	n := 0
+	for _, list := range openShells() {
+		n += len(list)
+	}
+	return fmt.Sprintf("%s, %d open", tilde(shellsPath()), n), nil
 }
 
 func checkEditor() (string, error) {

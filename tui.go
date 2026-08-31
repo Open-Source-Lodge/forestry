@@ -28,7 +28,7 @@ var (
 )
 
 const (
-	listHelp   = "↑↓ move · enter shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit"
+	listHelp   = "↑↓ move · enter shell · s find shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit"
 	newHelp    = "tab next field · enter create · esc cancel"
 	prHelp     = "↑↓ pick · ←→ page · type a number · enter create · esc cancel"
 	removeHelp = "y remove · Y remove + delete branch · f force remove · esc cancel"
@@ -56,6 +56,7 @@ type row struct {
 type rowsMsg struct {
 	rows    []row
 	current string
+	shells  map[string][]shell
 }
 
 // openPRsMsg carries the pull requests the picker offers, or why there are none.
@@ -80,6 +81,7 @@ type model struct {
 	rows    []row
 	current string
 	prs     map[string]PR
+	shells  map[string][]shell
 	cursor  int
 	// openPath asks tui() to open a shell there after Bubble Tea exits.
 	openPath string
@@ -128,12 +130,13 @@ func loadRows() tea.Msg {
 	if err != nil {
 		return doneMsg{err: err}
 	}
+	shells := openShells()
 	rows := make([]row, len(list))
 	for i, wt := range list {
-		rows[i] = row{wt: wt, status: status(wt)}
+		rows[i] = row{wt: wt, status: status(wt, len(shells[wt.Path]) > 0)}
 	}
 	current, _ := git("rev-parse", "--show-toplevel")
-	return rowsMsg{rows: rows, current: current}
+	return rowsMsg{rows: rows, current: current, shells: shells}
 }
 
 func loadPRs(rows []row) tea.Cmd {
@@ -186,7 +189,8 @@ func removeCmd(wt Worktree, force, branch bool) tea.Cmd {
 	}
 }
 
-// runShell runs an interactive shell rooted in path.
+// runShell runs an interactive shell rooted in path, and records it in the
+// shell registry for as long as it runs.
 func runShell(path string) error {
 	sh := os.Getenv("SHELL")
 	if sh == "" {
@@ -198,7 +202,23 @@ func runShell(path string) error {
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
-	return c.Run()
+	if err := c.Start(); err != nil {
+		return err
+	}
+	registerShell(c.Process.Pid, path)
+	err := c.Wait()
+	unregisterShell(c.Process.Pid)
+	return err
+}
+
+// focusShellCmd moves the focus to the terminal of an open shell.
+func focusShellCmd(s shell) tea.Cmd {
+	return func() tea.Msg {
+		if err := focusShell(s); err != nil {
+			return doneMsg{err: err}
+		}
+		return doneMsg{text: "moved the focus to the shell on " + s.tty}
+	}
 }
 
 // editorCmd opens the worktree in the configured editor. A terminal editor gets
@@ -238,7 +258,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 
 	case rowsMsg:
-		m.rows, m.current = msg.rows, msg.current
+		m.rows, m.current, m.shells = msg.rows, msg.current, msg.shells
 		if m.want != "" {
 			for i, r := range m.rows {
 				if r.wt.Path == m.want {
@@ -324,6 +344,16 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if wt, ok := m.selected(); ok {
 			m.openPath = wt.Path
 			return m, tea.Quit
+		}
+	case "s":
+		if wt, ok := m.selected(); ok {
+			list := m.shells[wt.Path]
+			if len(list) == 0 {
+				m.setMsg("", errors.New("no open shell in this worktree"))
+				break
+			}
+			m.setMsg("", nil)
+			return m, focusShellCmd(list[0])
 		}
 	case "e":
 		if wt, ok := m.selected(); ok {

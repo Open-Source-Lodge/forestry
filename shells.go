@@ -1,0 +1,170 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"runtime"
+	"strconv"
+	"strings"
+	"syscall"
+)
+
+// Forestry records each shell that `enter` opens in ~/.forestry-shells. Each
+// line holds one shell: pid, tty, tmux pane, worktree path. The status column
+// reads the file to show which worktrees have an open shell. The `s` key moves
+// the focus to the terminal of that shell, when the terminal permits it.
+
+type shell struct {
+	pid  int
+	tty  string // the terminal device, for example ttys004 or pts/1
+	pane string // the tmux pane, when forestry ran inside tmux
+	path string // the worktree
+}
+
+func shellsPath() string { return expandHome("~/.forestry-shells") }
+
+// registerShell records the shell with pid that runs in the worktree at path.
+func registerShell(pid int, path string) {
+	// The shell shares the terminal with the forestry process that starts it.
+	tty, _ := command("ps", "-o", "tty=", "-p", strconv.Itoa(os.Getpid()))
+	f, err := os.OpenFile(shellsPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	// ponytail: one O_APPEND write per shell; concurrent registrations stay
+	// whole, and openShells prunes whatever a crash leaves behind.
+	fmt.Fprintf(f, "%d\t%s\t%s\t%s\n", pid, tty, os.Getenv("TMUX_PANE"), path)
+	f.Close()
+}
+
+// unregisterShell removes the record of the shell with pid.
+func unregisterShell(pid int) {
+	var keep []shell
+	for _, s := range readShells() {
+		if s.pid != pid {
+			keep = append(keep, s)
+		}
+	}
+	writeShells(keep)
+}
+
+// openShells is the set of live shells, keyed by worktree path. It removes the
+// records of shells that no longer run.
+func openShells() map[string][]shell {
+	all := readShells()
+	var live []shell
+	for _, s := range all {
+		if alive(s.pid) {
+			live = append(live, s)
+		}
+	}
+	if len(live) != len(all) {
+		writeShells(live)
+	}
+	byPath := make(map[string][]shell)
+	for _, s := range live {
+		byPath[s.path] = append(byPath[s.path], s)
+	}
+	return byPath
+}
+
+func alive(pid int) bool {
+	err := syscall.Kill(pid, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
+}
+
+func readShells() []shell {
+	data, err := os.ReadFile(shellsPath())
+	if err != nil {
+		return nil
+	}
+	var list []shell
+	for _, line := range strings.Split(string(data), "\n") {
+		parts := strings.SplitN(line, "\t", 4)
+		if len(parts) != 4 {
+			continue
+		}
+		pid, err := strconv.Atoi(parts[0])
+		if err != nil {
+			continue
+		}
+		list = append(list, shell{pid: pid, tty: parts[1], pane: parts[2], path: parts[3]})
+	}
+	return list
+}
+
+func writeShells(list []shell) {
+	var b strings.Builder
+	for _, s := range list {
+		fmt.Fprintf(&b, "%d\t%s\t%s\t%s\n", s.pid, s.tty, s.pane, s.path)
+	}
+	os.WriteFile(shellsPath(), []byte(b.String()), 0o600)
+}
+
+// focusShell moves the focus to the terminal that holds the shell. A shell in
+// tmux gets its client switched; on macOS, a Terminal.app or iTerm2 tab is
+// selected by its tty. Anywhere else forestry can only say where the shell is.
+func focusShell(s shell) error {
+	if s.pane != "" {
+		if _, err := command("tmux", "switch-client", "-t", s.pane); err == nil {
+			return nil
+		}
+	}
+	if runtime.GOOS == "darwin" {
+		return focusTerminalApp("/dev/" + s.tty)
+	}
+	return fmt.Errorf("the shell is open on %s — forestry cannot move the focus on this system", s.tty)
+}
+
+// The scripts select the tab whose tty matches, and say "true" when one did.
+const terminalScript = `set found to false
+tell application "Terminal"
+	repeat with w in windows
+		repeat with t in tabs of w
+			if tty of t is "%s" then
+				set selected of t to true
+				set index of w to 1
+				set found to true
+			end if
+		end repeat
+	end repeat
+	if found then activate
+end tell
+return found`
+
+const itermScript = `set found to false
+tell application "iTerm2"
+	repeat with aWindow in windows
+		repeat with aTab in tabs of aWindow
+			repeat with aSession in sessions of aTab
+				if tty of aSession is "%s" then
+					select aWindow
+					select aTab
+					select aSession
+					set found to true
+				end if
+			end repeat
+		end repeat
+	end repeat
+	if found then activate
+end tell
+return found`
+
+func focusTerminalApp(tty string) error {
+	scripts := []struct{ proc, script string }{
+		{"Terminal", terminalScript},
+		{"iTerm2", itermScript},
+	}
+	for _, a := range scripts {
+		// pgrep keeps osascript from starting a terminal that does not run.
+		if _, err := command("pgrep", "-x", a.proc); err != nil {
+			continue
+		}
+		out, err := command("osascript", "-e", fmt.Sprintf(a.script, tty))
+		if err == nil && out == "true" {
+			return nil
+		}
+	}
+	return fmt.Errorf("the shell is open on %s, but no terminal window matches", strings.TrimPrefix(tty, "/dev/"))
+}
