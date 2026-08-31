@@ -81,7 +81,9 @@ terminal program, the `t` key does not work. The new shell also registers
 in `~/.forestry-shells`. A terminal cannot send the `ctrl+enter` or
 `cmd+enter` keys to forestry, thus the key is `t`.
 
-The `s` key moves the focus to the terminal of that shell. In tmux, forestry
+The `s` key moves the focus to the terminal of that shell. When the worktree
+has more than one open shell, forestry shows a list of the shells. Select a
+shell and push `enter` to move the focus to it. In tmux, forestry
 switches the client to the pane of the shell. On macOS, forestry selects the
 tab of Terminal or iTerm2 that has the shell. On a different system, or in a
 different terminal program, forestry shows the terminal device of the shell. Then

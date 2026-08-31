@@ -33,6 +33,7 @@ const (
 	prHelp     = "↑↓ pick · ←→ page · type a number · enter create · esc cancel"
 	removeHelp = "y remove · Y remove + delete branch · f force remove · esc cancel"
 	busyHelp   = "working · ctrl+c quit"
+	shellHelp  = "↑↓ pick · enter focus · esc cancel"
 )
 
 type mode int
@@ -45,6 +46,7 @@ const (
 	modeNew
 	modePR
 	modeRemove
+	modeShell
 )
 
 // row is a worktree together with the state the list renders for it.
@@ -98,6 +100,9 @@ type model struct {
 	prList   []openPR
 	prCursor int
 	prErr    string
+	// picker state for modeShell: the open shells of the selected worktree.
+	shellList   []shell
+	shellCursor int
 	// want is a path to move the cursor onto once the list reloads.
 	want   string
 	width  int
@@ -315,6 +320,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updatePR(msg)
 		case modeRemove:
 			return m.updateRemove(msg)
+		case modeShell:
+			return m.updateShell(msg)
 		default:
 			return m.updateList(msg)
 		}
@@ -363,12 +370,15 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "s":
 		if wt, ok := m.selected(); ok {
 			list := m.shells[wt.Path]
-			if len(list) == 0 {
-				m.setMsg("", errors.New("no open shell in this worktree"))
-				break
-			}
 			m.setMsg("", nil)
-			return m, focusShellCmd(list[0])
+			switch len(list) {
+			case 0:
+				m.setMsg("", errors.New("no open shell in this worktree"))
+			case 1:
+				return m, focusShellCmd(list[0])
+			default:
+				m.mode, m.shellList, m.shellCursor = modeShell, list, 0
+			}
 		}
 	case "e":
 		if wt, ok := m.selected(); ok {
@@ -500,6 +510,21 @@ func (m model) updateRemove(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m model) updateShell(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q", "ctrl+c":
+		m.mode = modeList
+	case "up", "k", "ctrl+p":
+		m.shellCursor = max(0, m.shellCursor-1)
+	case "down", "j", "ctrl+n":
+		m.shellCursor = min(len(m.shellList)-1, m.shellCursor+1)
+	case "enter", "s":
+		m.mode = modeList
+		return m, focusShellCmd(m.shellList[m.shellCursor])
+	}
+	return m, nil
+}
+
 // start runs cmd while the list shows a spinner for path, if any.
 func (m model) start(busy, path string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 	m.busy, m.busyPath = busy, path
@@ -558,6 +583,8 @@ func (m model) View() string {
 		b.WriteString(m.prView())
 	case modeRemove:
 		b.WriteString(m.removeView())
+	case modeShell:
+		b.WriteString(m.shellView())
 	default:
 		b.WriteString(m.msgView())
 		help := listHelp
@@ -694,6 +721,26 @@ func (m model) removeView() string {
 		b.WriteString("  " + dirtyStyle.Render("uncommitted changes — needs force") + "\n")
 	}
 	b.WriteString("  " + dimStyle.Render(removeHelp) + "\n")
+	return b.String()
+}
+
+// shellView lists the open shells of the selected worktree, so the user can
+// pick the one to focus.
+func (m model) shellView() string {
+	var b strings.Builder
+	b.WriteString("  " + titleStyle.Render("Open shells") + "\n\n")
+	for i, s := range m.shellList {
+		cursor, label := "  ", s.tty
+		if i == m.shellCursor {
+			cursor, label = cursorStyle.Render("❯ "), pickedStyle.Render(label)
+		}
+		where := ""
+		if s.pane != "" {
+			where = "tmux pane " + s.pane + " · "
+		}
+		b.WriteString(cursor + label + "  " + dimStyle.Render(where+"pid "+strconv.Itoa(s.pid)) + "\n")
+	}
+	b.WriteString("\n  " + dimStyle.Render(shellHelp) + "\n")
 	return b.String()
 }
 

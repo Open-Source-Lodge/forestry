@@ -629,3 +629,39 @@ func TestEditorCmdWithoutEditor(t *testing.T) {
 		t.Error("an editor must give a command")
 	}
 }
+
+func TestShellPicker(t *testing.T) {
+	m := newTestModel(fakeRows())
+	m.cursor = 1
+	m.shells = map[string][]shell{
+		"/tmp/feat-a": {{pid: 1, tty: "ttys001"}, {pid: 2, tty: "ttys002"}},
+	}
+
+	// Two shells open the picker instead of focusing the first one.
+	m, _ = sendKey(m, "s")
+	if m.mode != modeShell {
+		t.Fatalf("mode = %d, want modeShell", m.mode)
+	}
+	if len(m.shellList) != 2 || m.shellCursor != 0 {
+		t.Fatalf("picker holds %d shells at %d, want 2 at 0", len(m.shellList), m.shellCursor)
+	}
+	if v := m.View(); !strings.Contains(v, "ttys002") {
+		t.Error("the picker must list each shell")
+	}
+
+	m, _ = sendKey(m, "j")
+	if m.shellCursor != 1 {
+		t.Errorf("after j shellCursor = %d, want 1", m.shellCursor)
+	}
+	m, cmd := sendSpecialKey(m, tea.KeyEnter)
+	if m.mode != modeList || cmd == nil {
+		t.Error("enter must focus the selected shell and return to the list")
+	}
+
+	// Esc cancels.
+	m, _ = sendKey(m, "s")
+	m, _ = sendSpecialKey(m, tea.KeyEsc)
+	if m.mode != modeList {
+		t.Error("esc must return to the list")
+	}
+}
