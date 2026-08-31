@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -31,5 +32,41 @@ func TestShellRegistry(t *testing.T) {
 	unregisterShell(os.Getpid())
 	if got := openShells(); len(got) != 0 {
 		t.Errorf("openShells after unregister = %v, want none", got)
+	}
+}
+
+func TestOpenShellTabInTmux(t *testing.T) {
+	var got []string
+	stubCommand(t, func(name string, args ...string) (string, error) {
+		got = append([]string{name}, args...)
+		return "", nil
+	})
+	t.Setenv("TMUX", "/tmp/tmux-1/default,1,0")
+
+	if err := openShellTab("/wt/a b"); err != nil {
+		t.Fatal(err)
+	}
+	if got[0] != "tmux" || got[1] != "new-window" || got[3] != "/wt/a b" {
+		t.Errorf("tmux call = %v", got)
+	}
+	if !strings.Contains(got[4], "shell '/wt/a b'") {
+		t.Errorf("window command = %q, want it to run forestry shell", got[4])
+	}
+}
+
+func TestOpenShellTabWithoutTerminal(t *testing.T) {
+	t.Setenv("TMUX", "")
+	t.Setenv("TERM_PROGRAM", "")
+	if err := openShellTab("/wt/a"); err == nil {
+		t.Error("openShellTab must fail without tmux or a known terminal")
+	}
+}
+
+func TestShq(t *testing.T) {
+	if got := shq(`a'b`); got != `'a'\''b'` {
+		t.Errorf("shq = %q", got)
+	}
+	if got := asq(`a"b\c`); got != `a\"b\\c` {
+		t.Errorf("asq = %q", got)
 	}
 }

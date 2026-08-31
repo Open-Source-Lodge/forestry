@@ -28,7 +28,7 @@ var (
 )
 
 const (
-	listHelp   = "↑↓ move · enter shell · s find shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit"
+	listHelp   = "↑↓ move · enter shell · t shell tab · s find shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit"
 	newHelp    = "tab next field · enter create · esc cancel"
 	prHelp     = "↑↓ pick · ←→ page · type a number · enter create · esc cancel"
 	removeHelp = "y remove · Y remove + delete branch · f force remove · esc cancel"
@@ -211,6 +211,16 @@ func runShell(path string) error {
 	return err
 }
 
+// openShellTabCmd opens a new terminal tab with a shell in the worktree.
+func openShellTabCmd(path string) tea.Cmd {
+	return func() tea.Msg {
+		if err := openShellTab(path); err != nil {
+			return doneMsg{err: err}
+		}
+		return doneMsg{text: "opened a shell tab in " + filepath.Base(path)}
+	}
+}
+
 // focusShellCmd moves the focus to the terminal of an open shell.
 func focusShellCmd(s shell) tea.Cmd {
 	return func() tea.Msg {
@@ -344,6 +354,11 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if wt, ok := m.selected(); ok {
 			m.openPath = wt.Path
 			return m, tea.Quit
+		}
+	case "t":
+		if wt, ok := m.selected(); ok {
+			m.setMsg("", nil)
+			return m, openShellTabCmd(wt.Path)
 		}
 	case "s":
 		if wt, ok := m.selected(); ok {

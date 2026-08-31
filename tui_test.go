@@ -361,6 +361,14 @@ func TestEnterOpensShellPath(t *testing.T) {
 	}
 }
 
+func TestTabKeyReturnsCommand(t *testing.T) {
+	m := newTestModel(fakeRows())
+	_, cmd := sendKey(m, "t")
+	if cmd == nil {
+		t.Fatal("t must return a command that opens the shell tab")
+	}
+}
+
 func TestOpenPRKeyWithoutPR(t *testing.T) {
 	m := newTestModel(fakeRows())
 	m, cmd := sendKey(m, "p")

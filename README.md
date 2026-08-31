@@ -39,7 +39,7 @@ on the worktree that you select:
     bugfix-123  bugfix-123  clean    merged #7  ~/github/myrepo-worktrees/bugfix-123
     feat-login  feat/login  dirty    open #12   ~/github/myrepo-worktrees/feat-login
 
-  ↑↓ move · enter shell · s find shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit
+  ↑↓ move · enter shell · t shell tab · s find shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit
 ```
 
 | key             | operation                                            |
@@ -47,6 +47,7 @@ on the worktree that you select:
 | `↑` `↓` `k` `j` | move the selection                                   |
 | `g` `G`         | go to the first or the last worktree                 |
 | `enter`         | open a shell in the selected worktree                |
+| `t`             | open a shell in a new terminal tab                   |
 | `s`             | move the focus to the open shell of the worktree     |
 | `e`             | open the selected worktree in your editor            |
 | `n`             | make a worktree                                      |
@@ -72,6 +73,13 @@ Forestry records each shell that `enter` opens in `~/.forestry-shells`. The
 status of a worktree with an open shell shows `shell`. When you close the
 shell, forestry removes the record. Thus the status helps you find the
 terminals that you already have open.
+
+The `t` key opens a shell in a new terminal tab, and the forestry interface
+stays open. In tmux, forestry opens a new tmux window. On macOS, forestry
+opens a new tab in iTerm2, or a new window in Terminal. In a different
+terminal program, the `t` key does not work. The new shell also registers
+in `~/.forestry-shells`. A terminal cannot send the `ctrl+enter` or
+`cmd+enter` keys to forestry, thus the key is `t`.
 
 The `s` key moves the focus to the terminal of that shell. In tmux, forestry
 switches the client to the pane of the shell. On macOS, forestry selects the

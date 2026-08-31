@@ -46,6 +46,13 @@ func dispatch(cmd string, args []string) error {
 		return cmdRemove(args)
 	case "doctor":
 		return cmdDoctor(args)
+	case "shell":
+		// The `t` key in interactive mode runs this in the new tab, so that
+		// the shell registers itself. It is not in the usage text.
+		if len(args) != 1 {
+			return fmt.Errorf("usage: forestry shell <path>")
+		}
+		return runShell(args[0])
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 		return nil

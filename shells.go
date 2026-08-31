@@ -151,6 +151,55 @@ tell application "iTerm2"
 end tell
 return found`
 
+// openShellTab opens a new terminal tab that runs a shell in the worktree at
+// path. The tab runs `forestry shell`, so the shell registers itself. In tmux,
+// the tab is a tmux window. Terminal.app has no AppleScript command for a new
+// tab, so it gets a new window.
+func openShellTab(path string) error {
+	self, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	cmd := "exec " + shq(self) + " shell " + shq(path)
+	if os.Getenv("TMUX") != "" {
+		_, err := command("tmux", "new-window", "-c", path, cmd)
+		return err
+	}
+	if runtime.GOOS != "darwin" {
+		return errors.New("forestry cannot open a tab in this terminal — it needs tmux, Terminal or iTerm2")
+	}
+	switch os.Getenv("TERM_PROGRAM") {
+	case "Apple_Terminal":
+		_, err := command("osascript", "-e", fmt.Sprintf(terminalTabScript, asq(cmd)))
+		return err
+	case "iTerm.app":
+		_, err := command("osascript", "-e", fmt.Sprintf(itermTabScript, asq(cmd)))
+		return err
+	}
+	return errors.New("forestry cannot open a tab in this terminal — it needs tmux, Terminal or iTerm2")
+}
+
+const terminalTabScript = `tell application "Terminal"
+	activate
+	do script "%s"
+end tell`
+
+const itermTabScript = `tell application "iTerm2"
+	activate
+	if (count of windows) is 0 then
+		create window with default profile
+	else
+		tell current window to create tab with default profile
+	end if
+	tell current session of current window to write text "%s"
+end tell`
+
+// shq quotes s as one shell word.
+func shq(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
+
+// asq escapes s for an AppleScript string literal.
+func asq(s string) string { return strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) }
+
 func focusTerminalApp(tty string) error {
 	scripts := []struct{ proc, script string }{
 		{"Terminal", terminalScript},
