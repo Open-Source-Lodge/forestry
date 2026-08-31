@@ -21,6 +21,7 @@ forestry new <name> [--from <ref>]  make a worktree on branch <name>
 forestry pr <number>                make a worktree from a pull request
 forestry remove <name> [--force]    remove a worktree
 forestry doctor                     make sure that forestry can operate
+forestry version                    show the forestry version
 forestry help                       show the help
 ```
 
@@ -264,6 +265,10 @@ when forestry cannot operate without the dependency. Make the check give a
 warning when only one function is not fully available. Set `needs` to the
 prerequisite check. Then forestry reports a shared cause one time. Thus
 `forestry doctor` continues to tell you if all the functions operate.
+
+### Release
+
+Read [`DEVELOPMENT.md`](DEVELOPMENT.md) for the release procedure.
 
 ### Documentation rules
 
