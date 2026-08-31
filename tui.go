@@ -72,10 +72,12 @@ type openPRsMsg struct {
 type prsMsg map[string]PR
 
 // doneMsg reports the outcome of an action that ran outside the update loop.
+// noReload is set when the action did not change the worktree list.
 type doneMsg struct {
-	text string
-	path string
-	err  error
+	text     string
+	path     string
+	err      error
+	noReload bool
 }
 
 type model struct {
@@ -230,9 +232,9 @@ func openShellTabCmd(path string) tea.Cmd {
 func focusShellCmd(s shell) tea.Cmd {
 	return func() tea.Msg {
 		if err := focusShell(s); err != nil {
-			return doneMsg{err: err}
+			return doneMsg{err: err, noReload: true}
 		}
-		return doneMsg{text: "moved the focus to the shell on " + s.tty}
+		return doneMsg{text: "moved the focus to the shell on " + s.tty, noReload: true}
 	}
 }
 
@@ -301,6 +303,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setMsg(msg.text, msg.err)
 		if msg.err == nil {
 			m.want = msg.path
+		}
+		if msg.noReload {
+			return m, nil
 		}
 		return m, loadRows
 

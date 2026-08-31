@@ -630,6 +630,34 @@ func TestEditorCmdWithoutEditor(t *testing.T) {
 	}
 }
 
+func TestShellKey(t *testing.T) {
+	m := newTestModel(fakeRows())
+	m.cursor = 1
+
+	// No open shell shows an error.
+	m, cmd := sendKey(m, "s")
+	if cmd != nil {
+		t.Error("s with no shell must not return a command")
+	}
+	if !m.msgErr || !strings.Contains(m.msg, "no open shell") {
+		t.Errorf("msg = %q, want a no-open-shell error", m.msg)
+	}
+
+	// One open shell focuses it directly.
+	m.shells = map[string][]shell{"/tmp/feat-a": {{pid: 1, tty: "ttys001"}}}
+	m, cmd = sendKey(m, "s")
+	if m.mode != modeList || cmd == nil {
+		t.Error("s with one shell must return a focus command")
+	}
+
+	// A focus outcome must not reload the rows.
+	next, cmd := m.Update(doneMsg{text: "moved", noReload: true})
+	m = next.(model)
+	if cmd != nil {
+		t.Error("a noReload doneMsg must not reload the rows")
+	}
+}
+
 func TestShellPicker(t *testing.T) {
 	m := newTestModel(fakeRows())
 	m.cursor = 1

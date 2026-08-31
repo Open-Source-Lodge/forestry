@@ -231,7 +231,7 @@ func checkShell() (string, error) {
 func checkOpenShells() (string, error) {
 	f, err := os.OpenFile(shellsPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		return "", fmt.Errorf("%s is not writable: %v — forestry cannot record open shells", tilde(shellsPath()), err)
+		return "", fmt.Errorf("%s is not writable: %v. Forestry cannot record open shells", tilde(shellsPath()), err)
 	}
 	f.Close()
 	n := 0
