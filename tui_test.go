@@ -361,6 +361,14 @@ func TestEnterOpensShellPath(t *testing.T) {
 	}
 }
 
+func TestTabKeyReturnsCommand(t *testing.T) {
+	m := newTestModel(fakeRows())
+	_, cmd := sendKey(m, "t")
+	if cmd == nil {
+		t.Fatal("t must return a command that opens the shell tab")
+	}
+}
+
 func TestOpenPRKeyWithoutPR(t *testing.T) {
 	m := newTestModel(fakeRows())
 	m, cmd := sendKey(m, "p")
@@ -619,5 +627,69 @@ func TestEditorCmdWithoutEditor(t *testing.T) {
 	t.Setenv("FORESTRY_EDITOR", "true")
 	if editorCmd("/x") == nil {
 		t.Error("an editor must give a command")
+	}
+}
+
+func TestShellKey(t *testing.T) {
+	m := newTestModel(fakeRows())
+	m.cursor = 1
+
+	// No open shell shows an error.
+	m, cmd := sendKey(m, "s")
+	if cmd != nil {
+		t.Error("s with no shell must not return a command")
+	}
+	if !m.msgErr || !strings.Contains(m.msg, "no open shell") {
+		t.Errorf("msg = %q, want a no-open-shell error", m.msg)
+	}
+
+	// One open shell focuses it directly.
+	m.shells = map[string][]shell{"/tmp/feat-a": {{pid: 1, tty: "ttys001"}}}
+	m, cmd = sendKey(m, "s")
+	if m.mode != modeList || cmd == nil {
+		t.Error("s with one shell must return a focus command")
+	}
+
+	// A focus outcome must not reload the rows.
+	next, cmd := m.Update(doneMsg{text: "moved", noReload: true})
+	m = next.(model)
+	if cmd != nil {
+		t.Error("a noReload doneMsg must not reload the rows")
+	}
+}
+
+func TestShellPicker(t *testing.T) {
+	m := newTestModel(fakeRows())
+	m.cursor = 1
+	m.shells = map[string][]shell{
+		"/tmp/feat-a": {{pid: 1, tty: "ttys001"}, {pid: 2, tty: "ttys002"}},
+	}
+
+	// Two shells open the picker instead of focusing the first one.
+	m, _ = sendKey(m, "s")
+	if m.mode != modeShell {
+		t.Fatalf("mode = %d, want modeShell", m.mode)
+	}
+	if len(m.shellList) != 2 || m.shellCursor != 0 {
+		t.Fatalf("picker holds %d shells at %d, want 2 at 0", len(m.shellList), m.shellCursor)
+	}
+	if v := m.View(); !strings.Contains(v, "ttys002") {
+		t.Error("the picker must list each shell")
+	}
+
+	m, _ = sendKey(m, "j")
+	if m.shellCursor != 1 {
+		t.Errorf("after j shellCursor = %d, want 1", m.shellCursor)
+	}
+	m, cmd := sendSpecialKey(m, tea.KeyEnter)
+	if m.mode != modeList || cmd == nil {
+		t.Error("enter must focus the selected shell and return to the list")
+	}
+
+	// Esc cancels.
+	m, _ = sendKey(m, "s")
+	m, _ = sendSpecialKey(m, tea.KeyEsc)
+	if m.mode != modeList {
+		t.Error("esc must return to the list")
 	}
 }

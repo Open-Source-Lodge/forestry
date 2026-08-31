@@ -28,11 +28,12 @@ var (
 )
 
 const (
-	listHelp   = "↑↓ move · enter shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit"
+	listHelp   = "↑↓ move · enter shell · t shell tab · s find shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit"
 	newHelp    = "tab next field · enter create · esc cancel"
 	prHelp     = "↑↓ pick · ←→ page · type a number · enter create · esc cancel"
 	removeHelp = "y remove · Y remove + delete branch · f force remove · esc cancel"
 	busyHelp   = "working · ctrl+c quit"
+	shellHelp  = "↑↓ pick · enter focus · esc cancel"
 )
 
 type mode int
@@ -45,6 +46,7 @@ const (
 	modeNew
 	modePR
 	modeRemove
+	modeShell
 )
 
 // row is a worktree together with the state the list renders for it.
@@ -56,6 +58,7 @@ type row struct {
 type rowsMsg struct {
 	rows    []row
 	current string
+	shells  map[string][]shell
 }
 
 // openPRsMsg carries the pull requests the picker offers, or why there are none.
@@ -69,10 +72,12 @@ type openPRsMsg struct {
 type prsMsg map[string]PR
 
 // doneMsg reports the outcome of an action that ran outside the update loop.
+// noReload is set when the action did not change the worktree list.
 type doneMsg struct {
-	text string
-	path string
-	err  error
+	text     string
+	path     string
+	err      error
+	noReload bool
 }
 
 type model struct {
@@ -80,6 +85,7 @@ type model struct {
 	rows    []row
 	current string
 	prs     map[string]PR
+	shells  map[string][]shell
 	cursor  int
 	// openPath asks tui() to open a shell there after Bubble Tea exits.
 	openPath string
@@ -96,6 +102,9 @@ type model struct {
 	prList   []openPR
 	prCursor int
 	prErr    string
+	// picker state for modeShell: the open shells of the selected worktree.
+	shellList   []shell
+	shellCursor int
 	// want is a path to move the cursor onto once the list reloads.
 	want   string
 	width  int
@@ -128,12 +137,13 @@ func loadRows() tea.Msg {
 	if err != nil {
 		return doneMsg{err: err}
 	}
+	shells := openShells()
 	rows := make([]row, len(list))
 	for i, wt := range list {
-		rows[i] = row{wt: wt, status: status(wt)}
+		rows[i] = row{wt: wt, status: status(wt, len(shells[wt.Path]) > 0)}
 	}
 	current, _ := git("rev-parse", "--show-toplevel")
-	return rowsMsg{rows: rows, current: current}
+	return rowsMsg{rows: rows, current: current, shells: shells}
 }
 
 func loadPRs(rows []row) tea.Cmd {
@@ -186,7 +196,8 @@ func removeCmd(wt Worktree, force, branch bool) tea.Cmd {
 	}
 }
 
-// runShell runs an interactive shell rooted in path.
+// runShell runs an interactive shell rooted in path, and records it in the
+// shell registry for as long as it runs.
 func runShell(path string) error {
 	sh := os.Getenv("SHELL")
 	if sh == "" {
@@ -198,7 +209,33 @@ func runShell(path string) error {
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
-	return c.Run()
+	if err := c.Start(); err != nil {
+		return err
+	}
+	registerShell(c.Process.Pid, path)
+	err := c.Wait()
+	unregisterShell(c.Process.Pid)
+	return err
+}
+
+// openShellTabCmd opens a new terminal tab with a shell in the worktree.
+func openShellTabCmd(path string) tea.Cmd {
+	return func() tea.Msg {
+		if err := openShellTab(path); err != nil {
+			return doneMsg{err: err}
+		}
+		return doneMsg{text: "opened a shell tab in " + filepath.Base(path)}
+	}
+}
+
+// focusShellCmd moves the focus to the terminal of an open shell.
+func focusShellCmd(s shell) tea.Cmd {
+	return func() tea.Msg {
+		if err := focusShell(s); err != nil {
+			return doneMsg{err: err, noReload: true}
+		}
+		return doneMsg{text: "moved the focus to the shell on " + s.tty, noReload: true}
+	}
 }
 
 // editorCmd opens the worktree in the configured editor. A terminal editor gets
@@ -238,7 +275,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 
 	case rowsMsg:
-		m.rows, m.current = msg.rows, msg.current
+		m.rows, m.current, m.shells = msg.rows, msg.current, msg.shells
 		if m.want != "" {
 			for i, r := range m.rows {
 				if r.wt.Path == m.want {
@@ -267,6 +304,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err == nil {
 			m.want = msg.path
 		}
+		if msg.noReload {
+			return m, nil
+		}
 		return m, loadRows
 
 	case spinner.TickMsg:
@@ -285,6 +325,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updatePR(msg)
 		case modeRemove:
 			return m.updateRemove(msg)
+		case modeShell:
+			return m.updateShell(msg)
 		default:
 			return m.updateList(msg)
 		}
@@ -324,6 +366,24 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if wt, ok := m.selected(); ok {
 			m.openPath = wt.Path
 			return m, tea.Quit
+		}
+	case "t":
+		if wt, ok := m.selected(); ok {
+			m.setMsg("", nil)
+			return m, openShellTabCmd(wt.Path)
+		}
+	case "s":
+		if wt, ok := m.selected(); ok {
+			list := m.shells[wt.Path]
+			m.setMsg("", nil)
+			switch len(list) {
+			case 0:
+				m.setMsg("", errors.New("no open shell in this worktree"))
+			case 1:
+				return m, focusShellCmd(list[0])
+			default:
+				m.mode, m.shellList, m.shellCursor = modeShell, list, 0
+			}
 		}
 	case "e":
 		if wt, ok := m.selected(); ok {
@@ -455,6 +515,21 @@ func (m model) updateRemove(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m model) updateShell(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q", "ctrl+c":
+		m.mode = modeList
+	case "up", "k", "ctrl+p":
+		m.shellCursor = max(0, m.shellCursor-1)
+	case "down", "j", "ctrl+n":
+		m.shellCursor = min(len(m.shellList)-1, m.shellCursor+1)
+	case "enter", "s":
+		m.mode = modeList
+		return m, focusShellCmd(m.shellList[m.shellCursor])
+	}
+	return m, nil
+}
+
 // start runs cmd while the list shows a spinner for path, if any.
 func (m model) start(busy, path string, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 	m.busy, m.busyPath = busy, path
@@ -513,6 +588,8 @@ func (m model) View() string {
 		b.WriteString(m.prView())
 	case modeRemove:
 		b.WriteString(m.removeView())
+	case modeShell:
+		b.WriteString(m.shellView())
 	default:
 		b.WriteString(m.msgView())
 		help := listHelp
@@ -649,6 +726,26 @@ func (m model) removeView() string {
 		b.WriteString("  " + dirtyStyle.Render("uncommitted changes — needs force") + "\n")
 	}
 	b.WriteString("  " + dimStyle.Render(removeHelp) + "\n")
+	return b.String()
+}
+
+// shellView lists the open shells of the selected worktree, so the user can
+// pick the one to focus.
+func (m model) shellView() string {
+	var b strings.Builder
+	b.WriteString("  " + titleStyle.Render("Open shells") + "\n\n")
+	for i, s := range m.shellList {
+		cursor, label := "  ", s.tty
+		if i == m.shellCursor {
+			cursor, label = cursorStyle.Render("❯ "), pickedStyle.Render(label)
+		}
+		where := ""
+		if s.pane != "" {
+			where = "tmux pane " + s.pane + " · "
+		}
+		b.WriteString(cursor + label + "  " + dimStyle.Render(where+"pid "+strconv.Itoa(s.pid)) + "\n")
+	}
+	b.WriteString("\n  " + dimStyle.Render(shellHelp) + "\n")
 	return b.String()
 }
 

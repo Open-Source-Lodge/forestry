@@ -43,13 +43,13 @@ func TestStatus(t *testing.T) {
 	// function with worktrees that have no path (isDirty returns false for
 	// paths without git data).
 	wt := Worktree{Path: t.TempDir()}
-	got := status(wt)
+	got := status(wt, false)
 	if got != "clean" {
 		t.Errorf("status(clean wt) = %q, want clean", got)
 	}
 
 	wt.Main = true
-	got = status(wt)
+	got = status(wt, false)
 	if got != "main" && got != "main,dirty" {
 		// main flag must be present in the output
 		found := false
@@ -65,9 +65,15 @@ func TestStatus(t *testing.T) {
 
 	wt.Main = false
 	wt.Locked = true
-	got = status(wt)
+	got = status(wt, false)
 	if got != "locked" {
 		t.Errorf("status(locked wt) = %q, want locked", got)
+	}
+
+	wt.Locked = false
+	got = status(wt, true)
+	if got != "shell" {
+		t.Errorf("status(wt with shell) = %q, want shell", got)
 	}
 }
 

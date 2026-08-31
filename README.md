@@ -24,7 +24,8 @@ forestry doctor                     make sure that forestry can operate
 forestry help                       show the help
 ```
 
-In the output of `list`, the `*` mark shows the worktree that you are in.
+In the output of `list`, the `*` mark shows the worktree that you are in. The
+status shows `shell` when a shell from forestry is open in the worktree.
 
 ## Interactive mode
 
@@ -38,7 +39,7 @@ on the worktree that you select:
     bugfix-123  bugfix-123  clean    merged #7  ~/github/myrepo-worktrees/bugfix-123
     feat-login  feat/login  dirty    open #12   ~/github/myrepo-worktrees/feat-login
 
-  ↑↓ move · enter shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit
+  ↑↓ move · enter shell · t shell tab · s find shell · e editor · n new · P from PR · d remove · p open PR · r refresh · q quit
 ```
 
 | key             | operation                                            |
@@ -46,6 +47,8 @@ on the worktree that you select:
 | `↑` `↓` `k` `j` | move the selection                                   |
 | `g` `G`         | go to the first or the last worktree                 |
 | `enter`         | open a shell in the selected worktree                |
+| `t`             | open a shell in a new terminal tab                   |
+| `s`             | move the focus to the open shell of the worktree     |
 | `e`             | open the selected worktree in your editor            |
 | `n`             | make a worktree                                      |
 | `P`             | select an open pull request, or type its number      |
@@ -65,6 +68,26 @@ worktree.
 The `enter` key closes the interface. Then forestry starts `$SHELL` in the
 directory of the worktree. The `FORESTRY_WORKTREE` variable contains the path
 to that worktree.
+
+Forestry records each shell that `enter` opens in `~/.forestry-shells`. The
+status of a worktree with an open shell shows `shell`. When you close the
+shell, forestry removes the record. Thus the status helps you find the
+terminals that you already have open.
+
+The `t` key opens a shell in a new terminal tab, and the forestry interface
+stays open. In tmux, forestry opens a new tmux window. On macOS, forestry
+opens a new tab in iTerm2, or a new window in Terminal. In a different
+terminal program, the `t` key does not work. The new shell also registers
+in `~/.forestry-shells`. A terminal cannot send the `ctrl+enter` or
+`cmd+enter` keys to forestry, thus the key is `t`.
+
+The `s` key moves the focus to the terminal of that shell. When the worktree
+has more than one open shell, forestry shows a list of the shells. Select a
+shell and push `enter` to move the focus to it. In tmux, forestry
+switches the client to the pane of the shell. On macOS, forestry selects the
+tab of Terminal or iTerm2 that has the shell. On a different system, or in a
+different terminal program, forestry shows the terminal device of the shell. Then
+you can find the terminal yourself.
 
 The `e` key starts your editor. Forestry gives the directory of the worktree
 to the editor as an argument. Forestry looks for the editor in this sequence:
@@ -200,6 +223,7 @@ forestry uses. The command tells you which item has a fault:
 ✓ merge fallback  origin/main
 ✓ pull refs       git@github.com:me/myrepo.git
 ✓ shell           /bin/zsh
+✓ open shells     ~/.forestry-shells, 1 open
 ! editor          no editor set — e does nothing; set FORESTRY_EDITOR, VISUAL or EDITOR
 ```
 

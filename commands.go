@@ -18,6 +18,7 @@ func cmdList(args []string) error {
 		return err
 	}
 	current, _ := git("rev-parse", "--show-toplevel")
+	shells := openShells()
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "  NAME\tBRANCH\tSTATUS\tPATH")
@@ -26,12 +27,14 @@ func cmdList(args []string) error {
 		if wt.Path == current {
 			marker = "*"
 		}
-		fmt.Fprintf(w, "%s %s\t%s\t%s\t%s\n", marker, wt.Name(), wt.Ref(), status(wt), wt.Path)
+		fmt.Fprintf(w, "%s %s\t%s\t%s\t%s\n", marker, wt.Name(), wt.Ref(), status(wt, len(shells[wt.Path]) > 0), wt.Path)
 	}
 	return w.Flush()
 }
 
-func status(wt Worktree) string {
+// status describes wt for the STATUS column; shell says a forestry shell is
+// open in it.
+func status(wt Worktree, shell bool) string {
 	var parts []string
 	if wt.Main {
 		parts = append(parts, "main")
@@ -41,6 +44,9 @@ func status(wt Worktree) string {
 	}
 	if wt.Locked {
 		parts = append(parts, "locked")
+	}
+	if shell {
+		parts = append(parts, "shell")
 	}
 	if len(parts) == 0 {
 		return "clean"
