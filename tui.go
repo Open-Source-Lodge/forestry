@@ -432,22 +432,26 @@ func (m model) updateNew(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.mode = modeList
 		return m.start("creating "+name, "", createCmd(name, strings.TrimSpace(m.inputs[1].Value())))
-	case "tab", "down", "shift+tab", "up":
-		if msg.String() == "tab" || msg.String() == "down" {
-			m.focus = (m.focus + 1) % len(m.inputs)
-		} else {
-			m.focus = (m.focus - 1 + len(m.inputs)) % len(m.inputs)
-		}
-		for i := range m.inputs {
-			if i == m.focus {
-				m.inputs[i].Focus()
-			} else {
-				m.inputs[i].Blur()
-			}
-		}
-		return m, textinput.Blink
+	case "tab", "down":
+		m.focus = (m.focus + 1) % len(m.inputs)
+		return m.refocus()
+	case "shift+tab", "up":
+		m.focus = (m.focus - 1 + len(m.inputs)) % len(m.inputs)
+		return m.refocus()
 	}
 	return m.updateInputs(msg)
+}
+
+// refocus moves the cursor to the input at m.focus.
+func (m model) refocus() (tea.Model, tea.Cmd) {
+	for i := range m.inputs {
+		if i == m.focus {
+			m.inputs[i].Focus()
+		} else {
+			m.inputs[i].Blur()
+		}
+	}
+	return m, textinput.Blink
 }
 
 // updatePR drives the picker. What you type wins over what is selected, so a
