@@ -1,5 +1,16 @@
 # Development
 
+## Build
+
+The `Makefile` contains these commands:
+
+| command      | operation                          |
+| ------------ | ---------------------------------- |
+| `make`       | `lint`, `test` and `build`         |
+| `make build` | build `bin/forestry`               |
+| `make test`  | run the tests, as CI does          |
+| `make lint`  | format, vet and scan, as CI does   |
+
 ## Release
 
 The `release` workflow runs [release-please](https://github.com/googleapis/release-please)
