@@ -154,14 +154,19 @@ func loadPRs(rows []row) tea.Cmd {
 	return func() tea.Msg { return prsMsg(pullRequests(branches)) }
 }
 
-func createCmd(name, from string) tea.Cmd {
+// created runs make, which makes a worktree, and reports the result.
+func created(make func() (string, error)) tea.Cmd {
 	return func() tea.Msg {
-		path, err := createWorktree(name, from)
+		path, err := make()
 		if err != nil {
 			return doneMsg{err: err}
 		}
 		return doneMsg{text: "created " + filepath.Base(path), path: path}
 	}
+}
+
+func createCmd(name, from string) tea.Cmd {
+	return created(func() (string, error) { return createWorktree(name, from) })
 }
 
 func loadOpenPRs() tea.Msg {
@@ -170,13 +175,7 @@ func loadOpenPRs() tea.Msg {
 }
 
 func createFromPRCmd(number string) tea.Cmd {
-	return func() tea.Msg {
-		path, err := createFromPR(number)
-		if err != nil {
-			return doneMsg{err: err}
-		}
-		return doneMsg{text: "created " + filepath.Base(path), path: path}
-	}
+	return created(func() (string, error) { return createFromPR(number) })
 }
 
 // removeCmd removes wt. With branch set, it then deletes the local branch too.
