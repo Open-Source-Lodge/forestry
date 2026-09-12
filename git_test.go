@@ -38,7 +38,7 @@ func TestWorktreeNameAndRef(t *testing.T) {
 			ref:  "feat/login",
 		},
 		{
-			wt:   Worktree{Path: "/home/user/project", Head: "abcdef1234567890", Detached: true},
+			wt:   Worktree{Path: "/home/user/project", Head: "abcdef1234567890"},
 			name: "project",
 			ref:  "detached at abcdef12",
 		},
@@ -100,9 +100,6 @@ locked
 		t.Error("second worktree should not be main")
 	}
 
-	if !list[2].Detached {
-		t.Error("third worktree should be detached")
-	}
 	if list[2].Head != "deadbeef" {
 		t.Errorf("third worktree HEAD = %q, want %q", list[2].Head, "deadbeef")
 	}
