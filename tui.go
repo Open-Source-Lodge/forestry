@@ -552,29 +552,21 @@ func (m *model) setMsg(text string, err error) {
 	m.msg, m.msgErr = text, false
 }
 
+// input is one field of a form, with focus when it is the first.
+func input(placeholder string, focus bool) textinput.Model {
+	in := textinput.New()
+	in.Prompt, in.Placeholder, in.Width = "", placeholder, 40
+	if focus {
+		in.Focus()
+	}
+	return in
+}
+
 func newInputs() []textinput.Model {
-	name := textinput.New()
-	name.Prompt = ""
-	name.Placeholder = "feat/login"
-	name.Width = 40
-	name.Focus()
-
-	from := textinput.New()
-	from.Prompt = ""
-	from.Placeholder = "HEAD"
-	from.Width = 40
-
-	return []textinput.Model{name, from}
+	return []textinput.Model{input("feat/login", true), input("HEAD", false)}
 }
 
-func prInputs() []textinput.Model {
-	number := textinput.New()
-	number.Prompt = ""
-	number.Placeholder = "123"
-	number.Width = 40
-	number.Focus()
-	return []textinput.Model{number}
-}
+func prInputs() []textinput.Model { return []textinput.Model{input("123", true)} }
 
 func (m model) View() string {
 	var b strings.Builder
