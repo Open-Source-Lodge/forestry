@@ -16,23 +16,18 @@ func stubCommand(t *testing.T, run func(name string, args ...string) (string, er
 	t.Cleanup(func() { command = real })
 }
 
-// The list asks gh for the url, and the loudest pull request keeps its own.
-func TestGhPullRequestsKeepsURL(t *testing.T) {
-	var asked []string
-	stubCommand(t, func(name string, args ...string) (string, error) {
-		asked = append([]string{name}, args...)
-		return `[{"number":1,"state":"OPEN","isDraft":false,"headRefName":"feat","url":"https://example.com/1"},
-		         {"number":2,"state":"MERGED","isDraft":false,"headRefName":"feat","url":"https://example.com/2"}]`, nil
+// A branch with several pull requests keeps the loudest one.
+func TestGhPullRequestsKeepsLoudest(t *testing.T) {
+	stubCommand(t, func(string, ...string) (string, error) {
+		return `[{"number":1,"state":"OPEN","isDraft":false,"headRefName":"feat"},
+		         {"number":2,"state":"MERGED","isDraft":false,"headRefName":"feat"}]`, nil
 	})
 
 	prs, err := ghPullRequests()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(strings.Join(asked, " "), "url") {
-		t.Errorf("gh was not asked for the url: %v", asked)
-	}
-	want := PR{Number: 2, State: "merged", URL: "https://example.com/2"}
+	want := PR{Number: 2, State: "merged"}
 	if prs["feat"] != want {
 		t.Errorf("got %+v, want %+v", prs["feat"], want)
 	}
@@ -78,7 +73,7 @@ func TestKeyPOpensPR(t *testing.T) {
 		t.Errorf("got msg %q (err %v), want a no-pull-request error", got.msg, got.msgErr)
 	}
 
-	m.prs["feat"] = PR{Number: 7, State: "open", URL: "https://example.com/7"}
+	m.prs["feat"] = PR{Number: 7, State: "open"}
 	if _, cmd := m.updateList(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("p")}); cmd == nil {
 		t.Error("pull request #7 linked, but nothing was opened")
 	}

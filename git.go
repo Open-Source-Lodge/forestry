@@ -11,12 +11,11 @@ import (
 
 // Worktree is one entry of `git worktree list`.
 type Worktree struct {
-	Path     string
-	Branch   string
-	Head     string
-	Main     bool
-	Detached bool
-	Locked   bool
+	Path   string
+	Branch string
+	Head   string
+	Main   bool
+	Locked bool
 }
 
 func (w Worktree) Name() string { return filepath.Base(w.Path) }
@@ -33,12 +32,7 @@ func (w Worktree) Ref() string {
 	}
 }
 
-func shortSHA(sha string) string {
-	if len(sha) > 8 {
-		return sha[:8]
-	}
-	return sha
-}
+func shortSHA(sha string) string { return sha[:min(8, len(sha))] }
 
 func git(args ...string) (string, error) {
 	return command("git", args...)
@@ -86,8 +80,6 @@ func parseWorktreeOutput(out string) []Worktree {
 			cur.Head = val
 		case "branch":
 			cur.Branch = strings.TrimPrefix(val, "refs/heads/")
-		case "detached":
-			cur.Detached = true
 		case "locked":
 			cur.Locked = true
 		}

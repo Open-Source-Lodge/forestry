@@ -248,19 +248,8 @@ failure message, and not a message from each tool.
 
 ## Contribute
 
-The `Makefile` contains these commands:
-
-| command        | operation                                   |
-| -------------- | ------------------------------------------- |
-| `make`         | `vet`, `test` and `build`                   |
-| `make build`   | build `bin/forestry`                        |
-| `make run`     | `go run .`                                  |
-| `make test`    | `go test ./...`                             |
-| `make cover`   | test with coverage, as CI does              |
-| `make vet`     | `go vet ./...`                              |
-| `make fmt`     | `go fmt ./...`                              |
-| `make install` | install into `$GOBIN`                       |
-| `make clean`   | remove `bin/`                               |
+Read [`DEVELOPMENT.md`](DEVELOPMENT.md) for the build commands and the
+release procedure.
 
 **Add a doctor check for each new function.** A function can have a
 dependency outside of the process. Examples are a program on the `PATH`, an
@@ -271,10 +260,6 @@ when forestry cannot operate without the dependency. Make the check give a
 warning when only one function is not fully available. Set `needs` to the
 prerequisite check. Then forestry reports a shared cause one time. Thus
 `forestry doctor` continues to tell you if all the functions operate.
-
-### Release
-
-Read [`DEVELOPMENT.md`](DEVELOPMENT.md) for the release procedure.
 
 ### Documentation rules
 

@@ -154,14 +154,19 @@ func loadPRs(rows []row) tea.Cmd {
 	return func() tea.Msg { return prsMsg(pullRequests(branches)) }
 }
 
-func createCmd(name, from string) tea.Cmd {
+// created runs make, which makes a worktree, and reports the result.
+func created(make func() (string, error)) tea.Cmd {
 	return func() tea.Msg {
-		path, err := createWorktree(name, from)
+		path, err := make()
 		if err != nil {
 			return doneMsg{err: err}
 		}
 		return doneMsg{text: "created " + filepath.Base(path), path: path}
 	}
+}
+
+func createCmd(name, from string) tea.Cmd {
+	return created(func() (string, error) { return createWorktree(name, from) })
 }
 
 func loadOpenPRs() tea.Msg {
@@ -170,29 +175,20 @@ func loadOpenPRs() tea.Msg {
 }
 
 func createFromPRCmd(number string) tea.Cmd {
-	return func() tea.Msg {
-		path, err := createFromPR(number)
-		if err != nil {
-			return doneMsg{err: err}
-		}
-		return doneMsg{text: "created " + filepath.Base(path), path: path}
-	}
+	return created(func() (string, error) { return createFromPR(number) })
 }
 
-// removeCmd removes wt. With branch set, it then deletes the local branch too.
-func removeCmd(wt Worktree, force, branch bool) tea.Cmd {
+// removeCmd removes wt. With del set, it then deletes the branch with that flag.
+func removeCmd(wt Worktree, force bool, del string) tea.Cmd {
 	return func() tea.Msg {
-		if err := removeWorktree(wt, force); err != nil {
+		if err := removeWorktree(wt, force, del); err != nil {
 			return doneMsg{err: err}
 		}
-		if !branch || wt.Branch == "" {
-			return doneMsg{text: "removed " + wt.Name()}
+		text := "removed " + wt.Name()
+		if del != "" && wt.Branch != "" {
+			text += " and branch " + wt.Branch
 		}
-		// ponytail: -D, because the user asked for the branch to go.
-		if _, err := git("branch", "-D", wt.Branch); err != nil {
-			return doneMsg{err: fmt.Errorf("removed %s, but: %w", wt.Name(), err)}
-		}
-		return doneMsg{text: "removed " + wt.Name() + " and branch " + wt.Branch}
+		return doneMsg{text: text}
 	}
 }
 
@@ -436,22 +432,26 @@ func (m model) updateNew(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.mode = modeList
 		return m.start("creating "+name, "", createCmd(name, strings.TrimSpace(m.inputs[1].Value())))
-	case "tab", "down", "shift+tab", "up":
-		if msg.String() == "tab" || msg.String() == "down" {
-			m.focus = (m.focus + 1) % len(m.inputs)
-		} else {
-			m.focus = (m.focus - 1 + len(m.inputs)) % len(m.inputs)
-		}
-		for i := range m.inputs {
-			if i == m.focus {
-				m.inputs[i].Focus()
-			} else {
-				m.inputs[i].Blur()
-			}
-		}
-		return m, textinput.Blink
+	case "tab", "down":
+		m.focus = (m.focus + 1) % len(m.inputs)
+		return m.refocus()
+	case "shift+tab", "up":
+		m.focus = (m.focus - 1 + len(m.inputs)) % len(m.inputs)
+		return m.refocus()
 	}
 	return m.updateInputs(msg)
+}
+
+// refocus moves the cursor to the input at m.focus.
+func (m model) refocus() (tea.Model, tea.Cmd) {
+	for i := range m.inputs {
+		if i == m.focus {
+			m.inputs[i].Focus()
+		} else {
+			m.inputs[i].Blur()
+		}
+	}
+	return m, textinput.Blink
 }
 
 // updatePR drives the picker. What you type wins over what is selected, so a
@@ -502,13 +502,13 @@ func (m model) updateRemove(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "enter":
 		m.mode = modeList
-		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false, false))
+		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false, branchFlag(false)))
 	case "Y":
 		m.mode = modeList
-		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false, true))
+		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false, "-D"))
 	case "f":
 		m.mode = modeList
-		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, true, false))
+		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, true, branchFlag(true)))
 	case "esc", "n", "q", "ctrl+c":
 		m.mode = modeList
 	}
@@ -552,29 +552,21 @@ func (m *model) setMsg(text string, err error) {
 	m.msg, m.msgErr = text, false
 }
 
+// input is one field of a form, with focus when it is the first.
+func input(placeholder string, focus bool) textinput.Model {
+	in := textinput.New()
+	in.Prompt, in.Placeholder, in.Width = "", placeholder, 40
+	if focus {
+		in.Focus()
+	}
+	return in
+}
+
 func newInputs() []textinput.Model {
-	name := textinput.New()
-	name.Prompt = ""
-	name.Placeholder = "feat/login"
-	name.Width = 40
-	name.Focus()
-
-	from := textinput.New()
-	from.Prompt = ""
-	from.Placeholder = "HEAD"
-	from.Width = 40
-
-	return []textinput.Model{name, from}
+	return []textinput.Model{input("feat/login", true), input("HEAD", false)}
 }
 
-func prInputs() []textinput.Model {
-	number := textinput.New()
-	number.Prompt = ""
-	number.Placeholder = "123"
-	number.Width = 40
-	number.Focus()
-	return []textinput.Model{number}
-}
+func prInputs() []textinput.Model { return []textinput.Model{input("123", true)} }
 
 func (m model) View() string {
 	var b strings.Builder
