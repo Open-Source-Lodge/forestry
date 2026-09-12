@@ -1,0 +1,31 @@
+# Drive forestry for the demo GIF. The script assets/demo.sh starts this file.
+set timeout 20
+set stty_init "rows 14 columns 128"
+set send_slow {1 0.08}
+
+# Wait and read the output of forestry at the same time.
+proc pause {s} { expect -timeout $s timeout }
+
+log_user 0
+spawn forestry
+log_user 1
+# Answer the terminal queries of bubbletea, or it waits 5 seconds.
+expect -re {\[6n} { send "\033\]11;rgb:1e1e/1e1e/2e2e\033\\\033\[1;1R" }
+expect "myrepo"
+pause 2
+send "\033\[B"
+pause 1
+send "\033\[B"
+pause 1
+send "n"
+pause 1
+send -s "feat/search"
+pause 1
+send "\r"
+pause 3
+send "d"
+pause 2
+send "y"
+pause 3
+send "q"
+expect eof

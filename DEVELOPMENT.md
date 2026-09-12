@@ -11,6 +11,20 @@ The `Makefile` contains these commands:
 | `make test`  | run the tests, as CI does          |
 | `make lint`  | format, vet and scan, as CI does   |
 
+## Demo GIF
+
+The `README.md` shows `assets/demo.gif`. Make the GIF again when the
+interface changes:
+
+```sh
+brew install asciinema agg
+sh assets/demo.sh
+```
+
+The script builds forestry, makes a small repository with worktrees in a
+temporary directory, records a session with `assets/demo.exp`, and writes the
+GIF.
+
 ## Release
 
 The `release` workflow runs [release-please](https://github.com/googleapis/release-please)
