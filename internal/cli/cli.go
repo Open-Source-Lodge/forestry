@@ -1,8 +1,7 @@
-package main
+package cli
 
 import (
 	"fmt"
-	"os"
 	"runtime/debug"
 )
 
@@ -22,14 +21,9 @@ New branches are created from HEAD unless --from is given.
 Worktrees live in ../<repo>-worktrees/ by default; see README for config.
 `
 
-func main() {
-	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "forestry: "+err.Error())
-		os.Exit(1)
-	}
-}
-
-func run(args []string) error {
+// Run runs forestry with the command line arguments args, without the
+// program name.
+func Run(args []string) error {
 	if len(args) == 0 {
 		return tui()
 	}

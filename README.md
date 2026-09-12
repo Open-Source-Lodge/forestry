@@ -10,7 +10,7 @@ for all git operations.
 
 ```sh
 make build                                              # then move bin/forestry into a directory on your PATH
-go install github.com/Open-Source-Lodge/forestry@latest
+go install github.com/Open-Source-Lodge/forestry/cmd/forestry@latest
 ```
 
 Each [release](https://github.com/Open-Source-Lodge/forestry/releases) has
@@ -255,7 +255,7 @@ release procedure.
 dependency outside of the process. Examples are a program on the `PATH`, an
 environment variable, a directory that forestry writes to, or a network
 connection. For each such dependency, add an entry to the `checks` table in
-`doctor.go`. Also add a line to the example output above. Make the check fail
+`internal/cli/doctor.go`. Also add a line to the example output above. Make the check fail
 when forestry cannot operate without the dependency. Make the check give a
 warning when only one function is not fully available. Set `needs` to the
 prerequisite check. Then forestry reports a shared cause one time. Thus

@@ -5,7 +5,7 @@ BIN := bin/forestry
 all: lint test build
 
 build:
-	go build -o $(BIN) .
+	go build -o $(BIN) ./cmd/forestry
 
 test:
 	go test -race -cover ./...

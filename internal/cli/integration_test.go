@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"os"
@@ -55,7 +55,7 @@ func TestIntegrationList(t *testing.T) {
 	dir := initRepo(t)
 	cdRepo(t, dir)
 
-	err := run([]string{"list"})
+	err := Run([]string{"list"})
 	if err != nil {
 		t.Fatalf("forestry list: %v", err)
 	}
@@ -65,20 +65,20 @@ func TestIntegrationHelp(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
-	err := run([]string{"help"})
+	err := Run([]string{"help"})
 	if err != nil {
 		t.Fatalf("forestry help: %v", err)
 	}
 
 	for _, alias := range []string{"-h", "--help"} {
-		if err := run([]string{alias}); err != nil {
+		if err := Run([]string{alias}); err != nil {
 			t.Errorf("forestry %s: %v", alias, err)
 		}
 	}
 }
 
 func TestIntegrationUnknownCommand(t *testing.T) {
-	err := run([]string{"bogus"})
+	err := Run([]string{"bogus"})
 	if err == nil {
 		t.Fatal("expected error for unknown command")
 	}
@@ -95,7 +95,7 @@ func TestIntegrationNewAndRemove(t *testing.T) {
 	cdRepo(t, dir)
 
 	// Create a new worktree.
-	err := run([]string{"new", "feat-test"})
+	err := Run([]string{"new", "feat-test"})
 	if err != nil {
 		t.Fatalf("forestry new feat-test: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestIntegrationNewAndRemove(t *testing.T) {
 	}
 
 	// Remove the worktree.
-	err = run([]string{"remove", "feat-test"})
+	err = Run([]string{"remove", "feat-test"})
 	if err != nil {
 		t.Fatalf("forestry remove feat-test: %v", err)
 	}
@@ -147,12 +147,12 @@ func TestIntegrationRemoveCurrentWorktree(t *testing.T) {
 	dir := initRepo(t)
 	cdRepo(t, dir)
 
-	if err := run([]string{"new", "feat-here"}); err != nil {
+	if err := Run([]string{"new", "feat-here"}); err != nil {
 		t.Fatalf("forestry new feat-here: %v", err)
 	}
 	cdRepo(t, filepath.Join(worktreeRoot(dir), "feat-here"))
 
-	if err := run([]string{"remove", "feat-here"}); err != nil {
+	if err := Run([]string{"remove", "feat-here"}); err != nil {
 		t.Fatalf("forestry remove feat-here: %v", err)
 	}
 	// git must still work afterwards: we should have stepped up to the repo.
@@ -169,7 +169,7 @@ func TestIntegrationNewInvalidName(t *testing.T) {
 	cdRepo(t, dir)
 
 	for _, bad := range []string{"", "/absolute", "../up"} {
-		err := run([]string{"new", bad})
+		err := Run([]string{"new", bad})
 		if err == nil {
 			t.Errorf("forestry new %q expected error, got nil", bad)
 		}
@@ -183,7 +183,7 @@ func TestIntegrationRemoveMissingWorktree(t *testing.T) {
 	dir := initRepo(t)
 	cdRepo(t, dir)
 
-	err := run([]string{"remove", "nonexistent"})
+	err := Run([]string{"remove", "nonexistent"})
 	if err == nil {
 		t.Fatal("expected error removing nonexistent worktree")
 	}
@@ -196,13 +196,13 @@ func TestIntegrationNewFromRef(t *testing.T) {
 	dir := initRepo(t)
 	cdRepo(t, dir)
 
-	err := run([]string{"new", "feat-from-head", "--from", "HEAD"})
+	err := Run([]string{"new", "feat-from-head", "--from", "HEAD"})
 	if err != nil {
 		t.Fatalf("forestry new feat-from-head --from HEAD: %v", err)
 	}
 	t.Cleanup(func() {
 		// Best-effort cleanup.
-		run([]string{"remove", "--force", "feat-from-head"}) //nolint
+		Run([]string{"remove", "--force", "feat-from-head"}) //nolint
 	})
 
 	wts, err := worktrees()
