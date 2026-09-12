@@ -142,18 +142,14 @@ func existingAncestor(path string) string {
 	}
 }
 
-// settingsFiles are the `.forestry` files in play, nearest first.
-func settingsFiles() []string {
-	var paths []string
-	if path, err := repoConfigPath(); err == nil {
-		paths = append(paths, path)
-	}
-	return append(paths, configPath())
-}
-
 func checkConfig() (string, error) {
+	// The `.forestry` files in play, nearest first.
+	paths := []string{configPath()}
+	if path, err := repoConfigPath(); err == nil {
+		paths = append([]string{path}, paths...)
+	}
 	var found []string
-	for _, path := range settingsFiles() {
+	for _, path := range paths {
 		if _, err := os.Stat(path); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return "", fmt.Errorf("%s is unreadable: %v — forestry ignores it in silence", tilde(path), err)
