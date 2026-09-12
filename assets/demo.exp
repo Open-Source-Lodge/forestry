@@ -1,4 +1,4 @@
-# Drive forestry for the demo GIF. Started by assets/demo.sh.
+# Drive forestry for the demo GIF. The script assets/demo.sh starts this file.
 set timeout 20
 set stty_init "rows 14 columns 128"
 set send_slow {1 0.08}
