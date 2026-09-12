@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/Open-Source-Lodge/forestry/compare/v1.0.1...v1.0.2) (2026-09-12)
+
+
+### Bug Fixes
+
+* move the Go code into cmd/forestry and internal/cli ([#21](https://github.com/Open-Source-Lodge/forestry/issues/21)) ([cc6e9ad](https://github.com/Open-Source-Lodge/forestry/commit/cc6e9ad5fda265a8ff5fed56a027b7999eaed4df))
+
 ## [1.0.1](https://github.com/Open-Source-Lodge/forestry/compare/v1.0.0...v1.0.1) (2026-09-12)
 
 
