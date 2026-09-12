@@ -24,11 +24,11 @@ type shell struct {
 
 func shellsPath() string { return expandHome("~/.forestry-shells") }
 
-// lockShells takes an exclusive lock on the registry file. The lock makes
-// sure that a rewrite does not erase a record that a different process
-// appends at the same time. The returned function releases the lock.
-func lockShells() (func(), error) {
-	f, err := os.OpenFile(shellsPath(), os.O_CREATE|os.O_RDONLY, 0o600)
+// lockShells opens the registry file for append and takes an exclusive lock
+// on it. The lock makes sure that a rewrite does not erase a record that a
+// different process appends at the same time. Close releases the lock.
+func lockShells() (*os.File, error) {
+	f, err := os.OpenFile(shellsPath(), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -36,35 +36,30 @@ func lockShells() (func(), error) {
 		f.Close()
 		return nil, err
 	}
-	return func() { f.Close() }, nil
+	return f, nil
 }
 
 // registerShell records the shell with pid that runs in the worktree at path.
 func registerShell(pid int, path string) {
 	// The shell shares the terminal with the forestry process that starts it.
 	tty, _ := command("ps", "-o", "tty=", "-p", strconv.Itoa(os.Getpid()))
-	unlock, err := lockShells()
+	f, err := lockShells()
 	if err != nil {
 		return
 	}
-	defer unlock()
-	f, err := os.OpenFile(shellsPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return
-	}
+	defer f.Close()
 	// ponytail: flock serializes each append and each rewrite; openShells
 	// prunes what a crash leaves behind.
 	fmt.Fprintf(f, "%d\t%s\t%s\t%s\n", pid, tty, os.Getenv("TMUX_PANE"), path)
-	f.Close()
 }
 
 // unregisterShell removes the record of the shell with pid.
 func unregisterShell(pid int) {
-	unlock, err := lockShells()
+	f, err := lockShells()
 	if err != nil {
 		return
 	}
-	defer unlock()
+	defer f.Close()
 	var keep []shell
 	for _, s := range readShells() {
 		if s.pid != pid {
@@ -78,9 +73,9 @@ func unregisterShell(pid int) {
 // records of shells that no longer run.
 func openShells() map[string][]shell {
 	// Without the lock, forestry still reads the file, but does not prune it.
-	unlock, lockErr := lockShells()
+	f, lockErr := lockShells()
 	if lockErr == nil {
-		defer unlock()
+		defer f.Close()
 	}
 	all := readShells()
 	var live []shell
