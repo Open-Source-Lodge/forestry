@@ -1,9 +1,10 @@
+<p align="center"><img src="assets/logo.svg" alt="forestry logo" width="422"></p>
+
 # forestry
 
-Forestry is a terminal user interface and a command line tool. It manages git
-worktrees. Forestry sends commands to the `git` program and keeps no data of
-its own. Thus forestry shows the worktrees that you make with `git worktree`,
-and `git worktree` shows the worktrees that you make with forestry.
+Forestry is a tool help you manage git worktrees and parallel work. Forestry has a
+terminal user interface (TUI) and a command line (CLI). Forestry uses native `git`
+under the hood.
 
 ## Install
 
