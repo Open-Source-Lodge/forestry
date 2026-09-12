@@ -43,4 +43,5 @@ jobs:
               -ldflags "-s -w -X main.versionOverride=$TAG" \
               -o "forestry-${target%/*}-${target#*/}" .
           done
-          gh release upload "$TAG" forestry-*
+          sha256sum forestry-* > checksums.txt
+          gh release upload "$TAG" forestry-* checksums.txt
