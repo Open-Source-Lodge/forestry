@@ -12,6 +12,11 @@ make build                                              # then move bin/forestry
 go install github.com/Open-Source-Lodge/forestry@latest
 ```
 
+Each [release](https://github.com/Open-Source-Lodge/forestry/releases) has
+binaries for macOS and Linux, on amd64 and arm64. Download the binary for your
+system, check it against `checksums.txt`, and move it into a directory on your
+PATH.
+
 ## Commands
 
 ```
