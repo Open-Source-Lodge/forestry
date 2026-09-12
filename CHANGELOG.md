@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/Open-Source-Lodge/forestry/compare/v1.0.0...v1.0.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* add logo and update readme ([#18](https://github.com/Open-Source-Lodge/forestry/issues/18)) ([5f69cf6](https://github.com/Open-Source-Lodge/forestry/commit/5f69cf6bcd758f5e3c2b7f659066655a528d2dd5))
+
 ## 1.0.0 (2026-09-12)
 
 
