@@ -3,7 +3,7 @@
 # The Claude model that checks the rules.
 model = "claude-opus-5"
 
-# The largest prompt observatory sends, in tokens. A run that would send more stops.
+# The largest prompt observatory sends, in tokens. If a run sends more, the run stops.
 max_tokens = 200000
 
 # The largest answer observatory accepts from the model, in tokens.

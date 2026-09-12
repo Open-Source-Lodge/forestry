@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 422 224" width="422" height="224" role="img" aria-label="forestry logo">
-  <!-- worktrees grow from branches of one git history line; two trees are chopped down; one branches from another branch; the last two share a node -->
+  <!-- The worktrees grow from the branches of one git history line. Two trees lie on the ground. One tree branches from a different branch. The last two trees share one node. -->
   <g stroke="#8b6f47" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 170 H410"/>
     <path d="M20 170 L36 154 V98"/>
