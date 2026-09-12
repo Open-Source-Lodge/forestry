@@ -143,7 +143,7 @@ func existingAncestor(path string) string {
 }
 
 func checkConfig() (string, error) {
-	// The `.forestry` files in play, nearest first.
+	// The `.forestry` files that forestry reads, nearest first.
 	paths := []string{configPath()}
 	if path, err := repoConfigPath(); err == nil {
 		paths = append([]string{path}, paths...)

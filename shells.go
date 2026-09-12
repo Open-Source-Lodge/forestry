@@ -24,9 +24,9 @@ type shell struct {
 
 func shellsPath() string { return expandHome("~/.forestry-shells") }
 
-// lockShells opens the registry file for append and takes an exclusive lock
-// on it. The lock makes sure that a rewrite does not erase a record that a
-// different process appends at the same time. Close releases the lock.
+// lockShells opens the registry file in append mode and takes an exclusive
+// lock on it. The lock makes sure that a rewrite does not erase a record that
+// a different process writes at the same time. Close releases the lock.
 func lockShells() (*os.File, error) {
 	f, err := os.OpenFile(shellsPath(), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o600)
 	if err != nil {
