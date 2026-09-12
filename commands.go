@@ -181,7 +181,7 @@ func cmdRemove(args []string) error {
 		return err
 	}
 	here := insideDir(wt.Path)
-	if err := removeWorktree(wt, force); err != nil {
+	if err := removeWorktree(wt, force, branchFlag(force)); err != nil {
 		return err
 	}
 	fmt.Printf("removed %s\n", wt.Path)
@@ -194,7 +194,21 @@ func cmdRemove(args []string) error {
 	return nil
 }
 
-func removeWorktree(wt Worktree, force bool) error {
+// branchFlag is the flag `git branch` gets to delete the branch of a removed
+// worktree: none unless the config asks, -D when force is set.
+func branchFlag(force bool) string {
+	switch {
+	case !deleteBranchOnRemove():
+		return ""
+	case force:
+		return "-D"
+	}
+	return "-d"
+}
+
+// removeWorktree removes wt. With del set, it then deletes the branch with
+// that flag.
+func removeWorktree(wt Worktree, force bool, del string) error {
 	if wt.Main {
 		return errors.New("refusing to remove the main worktree")
 	}
@@ -216,12 +230,8 @@ func removeWorktree(wt Worktree, force bool) error {
 	if _, err := git(rm...); err != nil {
 		return err
 	}
-	if wt.Branch == "" || !deleteBranchOnRemove() {
+	if wt.Branch == "" || del == "" {
 		return nil
-	}
-	del := "-d"
-	if force {
-		del = "-D"
 	}
 	if _, err := git("branch", del, "--", wt.Branch); err != nil {
 		return fmt.Errorf("removed the worktree, but kept branch %q: %w", wt.Branch, err)

@@ -178,20 +178,17 @@ func createFromPRCmd(number string) tea.Cmd {
 	return created(func() (string, error) { return createFromPR(number) })
 }
 
-// removeCmd removes wt. With branch set, it then deletes the local branch too.
-func removeCmd(wt Worktree, force, branch bool) tea.Cmd {
+// removeCmd removes wt. With del set, it then deletes the branch with that flag.
+func removeCmd(wt Worktree, force bool, del string) tea.Cmd {
 	return func() tea.Msg {
-		if err := removeWorktree(wt, force); err != nil {
+		if err := removeWorktree(wt, force, del); err != nil {
 			return doneMsg{err: err}
 		}
-		if !branch || wt.Branch == "" {
-			return doneMsg{text: "removed " + wt.Name()}
+		text := "removed " + wt.Name()
+		if del != "" && wt.Branch != "" {
+			text += " and branch " + wt.Branch
 		}
-		// ponytail: -D, because the user asked for the branch to go.
-		if _, err := git("branch", "-D", wt.Branch); err != nil {
-			return doneMsg{err: fmt.Errorf("removed %s, but: %w", wt.Name(), err)}
-		}
-		return doneMsg{text: "removed " + wt.Name() + " and branch " + wt.Branch}
+		return doneMsg{text: text}
 	}
 }
 
@@ -501,13 +498,13 @@ func (m model) updateRemove(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "enter":
 		m.mode = modeList
-		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false, false))
+		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false, branchFlag(false)))
 	case "Y":
 		m.mode = modeList
-		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false, true))
+		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, false, "-D"))
 	case "f":
 		m.mode = modeList
-		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, true, false))
+		return m.start("removing "+wt.Name(), wt.Path, removeCmd(wt, true, branchFlag(true)))
 	case "esc", "n", "q", "ctrl+c":
 		m.mode = modeList
 	}

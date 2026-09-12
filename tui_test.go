@@ -273,12 +273,12 @@ func TestRemoveCmdDeletesBranch(t *testing.T) {
 		ran = append(ran, strings.Join(args, " "))
 		return "", nil
 	})
-	msg := removeCmd(Worktree{Path: "/x/wt", Branch: "feat"}, false, true)().(doneMsg)
+	msg := removeCmd(Worktree{Path: "/x/wt", Branch: "feat"}, false, "-D")().(doneMsg)
 	if msg.err != nil {
 		t.Fatal(msg.err)
 	}
 	joined := strings.Join(ran, "\n")
-	if !strings.Contains(joined, "worktree remove /x/wt") || !strings.Contains(joined, "branch -D feat") {
+	if !strings.Contains(joined, "worktree remove /x/wt") || !strings.Contains(joined, "branch -D -- feat") {
 		t.Errorf("wrong git calls:\n%s", joined)
 	}
 }
@@ -301,7 +301,7 @@ func TestRemoveKeysRunTheCorrectCommand(t *testing.T) {
 	}{
 		{"y", "worktree remove /tmp/feat-a"},
 		{"f", "worktree remove /tmp/feat-a --force"},
-		{"Y", "branch -D feat/a"},
+		{"Y", "branch -D -- feat/a"},
 	}
 	for _, tt := range tests {
 		var ran []string
@@ -608,7 +608,7 @@ func TestCreateCmdsReportErrors(t *testing.T) {
 	if msg := createFromPRCmd("1")().(doneMsg); msg.err == nil {
 		t.Error("createFromPRCmd must report the failure")
 	}
-	if msg := removeCmd(Worktree{Path: "/x"}, false, false)().(doneMsg); msg.err == nil {
+	if msg := removeCmd(Worktree{Path: "/x"}, false, "")().(doneMsg); msg.err == nil {
 		t.Error("removeCmd must report the failure")
 	}
 	if msg := loadRows().(doneMsg); msg.err == nil {
