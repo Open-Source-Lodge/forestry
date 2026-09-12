@@ -1,34 +1,18 @@
 BIN := bin/forestry
 
-.PHONY: all build run test cover vet lint fmt install clean
+.PHONY: all build test lint
 
 all: lint test build
 
 build:
 	go build -o $(BIN) .
 
-run:
-	go run .
-
 test:
-	go test ./...
+	go test -race -cover ./...
 
-cover:
-	go test -cover ./...
-
-vet:
+lint:
+	test -z "$$(gofmt -l .)" || { gofmt -l .; echo "run go fmt ./..."; exit 1; }
 	go vet ./...
-
-lint: vet
-	test -z "$$(gofmt -l .)"
 	go run honnef.co/go/tools/cmd/staticcheck@latest ./...
 	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
-
-fmt:
-	go fmt ./...
-
-install:
-	go install .
-
-clean:
-	rm -rf bin
+	go mod tidy && git diff --exit-code go.mod go.sum

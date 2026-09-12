@@ -250,17 +250,12 @@ failure message, and not a message from each tool.
 
 The `Makefile` contains these commands:
 
-| command        | operation                                   |
-| -------------- | ------------------------------------------- |
-| `make`         | `vet`, `test` and `build`                   |
-| `make build`   | build `bin/forestry`                        |
-| `make run`     | `go run .`                                  |
-| `make test`    | `go test ./...`                             |
-| `make cover`   | test with coverage, as CI does              |
-| `make vet`     | `go vet ./...`                              |
-| `make fmt`     | `go fmt ./...`                              |
-| `make install` | install into `$GOBIN`                       |
-| `make clean`   | remove `bin/`                               |
+| command      | operation                          |
+| ------------ | ---------------------------------- |
+| `make`       | `lint`, `test` and `build`         |
+| `make build` | build `bin/forestry`               |
+| `make test`  | run the tests, as CI does          |
+| `make lint`  | format, vet and scan, as CI does   |
 
 **Add a doctor check for each new function.** A function can have a
 dependency outside of the process. Examples are a program on the `PATH`, an
