@@ -6,6 +6,8 @@ Forestry is a tool that helps you manage git worktrees and parallel work. Forest
 terminal user interface (TUI) and a command line (CLI). Forestry uses native `git`
 for all git operations.
 
+<p align="center"><img src="assets/demo.gif" alt="forestry interactive mode" width="900"></p>
+
 ## Install
 
 ```sh
