@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/Open-Source-Lodge/forestry/compare/v1.0.2...v1.0.3) (2026-09-12)
+
+
+### Bug Fixes
+
+* add an animated demo of the interactive mode ([#23](https://github.com/Open-Source-Lodge/forestry/issues/23)) ([c743ade](https://github.com/Open-Source-Lodge/forestry/commit/c743ade332c54698696f37da27e25d7579c46614))
+
 ## [1.0.2](https://github.com/Open-Source-Lodge/forestry/compare/v1.0.1...v1.0.2) (2026-09-12)
 
 
